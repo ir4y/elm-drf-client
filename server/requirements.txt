@@ -1,5 +1,6 @@
 Django==1.9.5
 dj-database-url==0.4.1
+django-cors-headers==0.11
 djangorestframework==3.3.3
 ipdb==0.9.3
 ipython==4.2.0
