@@ -1,0 +1,20 @@
+version: '2'
+services:
+  db:
+    image: postgres:9.4
+
+  server:
+    build: ./server
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgres://postgres@db/postgres
+
+  client:
+    build: ./client
+    command: elm-reactor -a 0.0.0.0 -p 3000
+    ports:
+      - 3000:3000
