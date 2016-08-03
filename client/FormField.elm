@@ -20,8 +20,7 @@ type alias FieldInfo =
 
 
 fieldInfoDecoder =
-    object4 FieldInfo ("type" := string)
-                      ("required" := bool)
-                      ("read_only"  := bool)
+    object4 FieldInfo ("type"      := string)
+                      ("required"  := bool)
+                      ("read_only" := bool)
                       ("label"     := string)
-
