@@ -2,11 +2,9 @@ import Html exposing (..)
 import Html.App as App
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Http
-import Json.Decode as Json
-import Json.Decode exposing (..)
-import Json.Encode as JsonEncode
-import Task
+import HttpBuilder
+import Json.Decode as Decode
+import Json.Encode as Encode
 import FormField
 import Dict
 import Material
@@ -18,8 +16,8 @@ import Material.Spinner as Loading
 import String
 import Maybe
 import Result
-import Task exposing (Task, andThen, mapError, succeed, fail)
-
+import Task
+import Http
 
 
 main =
@@ -63,10 +61,10 @@ type Msg
   = NoOp
   | MDL (Material.Msg Msg)
   | UserInput String String
-  | FetchFail Http.Error
-  | FetchSucceed (List (String, FormField.FieldInfo))
-  | UploadFail MyHttpError
-  | UploadSucceed String
+  | FetchFail (HttpBuilder.Error String)
+  | FetchSucceed (HttpBuilder.Response (List (String, FormField.FieldInfo)))
+  | UploadFail (HttpBuilder.Error (Dict.Dict String (List String)))
+  | UploadSucceed (HttpBuilder.Response String)
   | SubmitForm
 
 
@@ -77,25 +75,24 @@ update msg model =
       (model, Cmd.none)
     MDL action' ->
       Material.update action' model
-    FetchSucceed fieldInfos ->
-      ({ model | fieldInfos = fieldInfos, preloader = False } , Cmd.none)
+    FetchSucceed response ->
+      ({ model | fieldInfos = response.data, preloader = False } , Cmd.none)
     FetchFail error ->
       ({model | preloader = False},  Cmd.none)
     UserInput key data ->
       ({ model | formData = Dict.insert key data model.formData }, Cmd.none)
     SubmitForm ->
       ({model | preloader = True}, sendQuestionToServer model.formData)
-    UploadSucceed text ->
+    UploadSucceed response ->
       ({model | formErrors = Dict.empty, formData = Dict.empty, preloader=False}, Cmd.none)
     UploadFail error ->
       let model' = {model | preloader = False}
       in
         case error of
-          Timeout  -> (model',  Cmd.none)
-          NetworkError -> (model',  Cmd.none)
-          UnexpectedPayload _  -> (model',  Cmd.none)
-          BadResponse 400 payload -> ({model' | formErrors = extractErrors payload}, Cmd.none)
-          BadResponse _ _ -> (model', Cmd.none)
+          HttpBuilder.UnexpectedPayload _  -> (model',  Cmd.none)
+          HttpBuilder.NetworkError -> (model',  Cmd.none)
+          HttpBuilder.Timeout  -> (model',  Cmd.none)
+          HttpBuilder.BadResponse response -> ({model' | formErrors = response.data}, Cmd.none)
 
 
 
@@ -144,74 +141,31 @@ subscriptions model =
 
 
 -- HTTP
-getQustionInfo : Cmd Msg
 getQustionInfo =
-    let url = "http://localhost:8000/poll/question/"
-        requestParams = { verb = "OPTIONS"
-                        , url = url
-                        , body = Http.empty
-                        , headers = []
-                        }
-        request = Http.send Http.defaultSettings requestParams
-    in Task.perform FetchFail FetchSucceed (Http.fromJson questionOptionDecoder request)
+  Task.perform FetchFail FetchSucceed getQustionInfoTask
 
-questionOptionDecoder : Json.Decoder (List (String, FormField.FieldInfo))
+getQustionInfoTask =
+  HttpBuilder.options "http://localhost:8000/poll/question/"
+    |> HttpBuilder.send (HttpBuilder.jsonReader questionOptionDecoder) HttpBuilder.stringReader
+
+questionOptionDecoder : Decode.Decoder (List (String, FormField.FieldInfo))
 questionOptionDecoder =
-    Json.at ["actions", "POST"] (Json.keyValuePairs FormField.fieldInfoDecoder)
+    Decode.at ["actions", "POST"] (Decode.keyValuePairs FormField.fieldInfoDecoder)
 
+--sendQuestionToServer : (Dict.Dict String String) ->
 sendQuestionToServer data =
-    let url = "http://localhost:8000/poll/question/"
-        dataList = encodeData data
-        encodedData = Http.string (JsonEncode.encode 0 (JsonEncode.object dataList))
-        requestParams = { verb = "POST"
-                        , url = url
-                        , body = encodedData
-                        , headers = [("Content-Type", "application/json")]
-                        }
-        request = Http.send Http.defaultSettings requestParams
-    in Task.perform UploadFail UploadSucceed (handleUpload request)
+  Task.perform UploadFail UploadSucceed (sendQuestionToServerTask data)
+
+
+--sendQuestionToServer : (Dict.Dict String String) -> (HttpBuilder.BodyReader String) -> (HttpBuilder.BodyReader (
+sendQuestionToServerTask data =
+  HttpBuilder.post "http://localhost:8000/poll/question/"
+    |> HttpBuilder.withJsonBody (Encode.object (encodeData data))
+    |> HttpBuilder.withHeader "Content-Type" "application/json"
+    |> HttpBuilder.send HttpBuilder.stringReader (HttpBuilder.jsonReader (Decode.dict (Decode.list Decode.string)))
 
 wrapValues (k,v) =
-  (k, JsonEncode.string v)
+  (k, Encode.string v)
 
 encodeData data =
   List.map wrapValues (Dict.toList data)
-
-
-extractErrors payload = Result.withDefault Dict.empty (Json.decodeString (Json.dict (Json.list Json.string)) payload)
-
-
-type MyHttpError
-  = Timeout
-  | NetworkError
-  | UnexpectedPayload String
-  | BadResponse Int String
-
-
-handleUpload : Task Http.RawError Http.Response -> Task MyHttpError String
-handleUpload response =
-  mapError promoteError response `Task.andThen` handleResponse
-
-handleResponse : Http.Response -> Task MyHttpError String
-handleResponse response =
-  if 200 <= response.status && response.status < 300 then
-      case response.value of
-                Http.Text str ->
-                  Task.succeed str
-                _ ->
-                  Task.fail (UnexpectedPayload "Response body is a blob, expecting a string.")
-  else
-
-      case response.value of
-          Http.Text str ->
-            Task.fail (BadResponse response.status str)
-          _ ->
-            Task.fail (UnexpectedPayload "Response body is a blob, expecting a string.")
-
-
-
-promoteError : Http.RawError -> MyHttpError
-promoteError rawError =
-  case rawError of
-    Http.RawTimeout -> Timeout
-    Http.RawNetworkError -> NetworkError
