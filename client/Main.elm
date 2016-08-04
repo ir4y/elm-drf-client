@@ -3,9 +3,9 @@ import Html.App as App
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import HttpBuilder
-import Json.Decode as Decode
-import Json.Encode as Encode
-import Form
+import Form.Data as FormData
+import Form.Form as Form
+import Form.Http exposing (..)
 import Dict
 import Material
 import Material.Scheme
@@ -13,11 +13,8 @@ import Material.Table as Table
 import Material.Textfield as Textfield
 import Material.Button as Button exposing (..)
 import Material.Spinner as Loading
-import String
 import Maybe
-import Result
 import Task
-import Http
 
 
 main =
@@ -34,19 +31,13 @@ main =
 
 
 type alias Model =
-  { fieldInfos : Form.FormInfo
-  , mdl: Material.Model
-  , formData: Form.FormData
-  , formErrors: Form.FormErrors
+  { form: Form.Model
   , preloader: Bool
   }
 
 init : (Model, Cmd Msg)
 init =
-  ( { fieldInfos = []
-    , mdl = Material.model
-    , formData = Dict.empty
-    , formErrors = Dict.empty
+  ( { form = Form.init
     , preloader = True
     }
   , getQustionInfo
@@ -58,33 +49,27 @@ init =
 
 
 type Msg
-  = NoOp
-  | MDL (Material.Msg Msg)
-  | UserInput String String
+  = FormMsg Form.Msg
   | FetchFail (HttpBuilder.Error String)
-  | FetchSucceed (HttpBuilder.Response Form.FormInfo)
-  | UploadFail (HttpBuilder.Error Form.FormErrors)
+  | FetchSucceed (HttpBuilder.Response FormData.FormInfo)
+  | UploadFail (HttpBuilder.Error FormData.FormErrors)
   | UploadSucceed (HttpBuilder.Response String)
-  | SubmitForm
 
+a = Form.SubmitForm
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    NoOp ->
-      (model, Cmd.none)
-    MDL action' ->
-      Material.update action' model
+    FormMsg msg' ->
+      case msg' of
+        Form.SubmitForm -> ({model | preloader = True}, sendQuestionToServer model.form.formData)
+        _ -> ({ model | form = Form.update msg' model.form}, Cmd.none)
     FetchSucceed response ->
-      ({ model | fieldInfos = response.data, preloader = False } , Cmd.none)
+      ({ model | form = Form.setFormInfo model.form response.data, preloader = False }, Cmd.none)
     FetchFail error ->
       ({model | preloader = False},  Cmd.none)
-    UserInput key data ->
-      ({ model | formData = Dict.insert key data model.formData }, Cmd.none)
-    SubmitForm ->
-      ({model | preloader = True}, sendQuestionToServer model.formData)
     UploadSucceed response ->
-      ({model | formErrors = Dict.empty, formData = Dict.empty, preloader=False}, Cmd.none)
+      ({model | form = Form.clenup model.form, preloader=False}, Cmd.none)
     UploadFail error ->
       let model' = {model | preloader = False}
       in
@@ -92,7 +77,7 @@ update msg model =
           HttpBuilder.UnexpectedPayload _  -> (model',  Cmd.none)
           HttpBuilder.NetworkError -> (model',  Cmd.none)
           HttpBuilder.Timeout  -> (model',  Cmd.none)
-          HttpBuilder.BadResponse response -> ({model' | formErrors = response.data}, Cmd.none)
+          HttpBuilder.BadResponse response -> ({model' | form = Form.setFormErrors model'.form response.data}, Cmd.none)
 
 
 
@@ -100,35 +85,11 @@ update msg model =
 -- VIEW
 
 
-tableItemView : Model -> (String, Form.FieldInfo) -> Int -> Html Msg
-tableItemView model (name, fieldInfo) index =
-    Table.tr [] [ Table.td [] [text fieldInfo.label]
-                , Table.td [] [Textfield.render MDL [index] model.mdl
-                                                (List.concat
-                                                  [ [ Textfield.label fieldInfo.label
-                                                    , Textfield.value (Maybe.withDefault "" (Dict.get name model.formData))
-                                                    , Textfield.onInput (UserInput name)
-                                                    ]
-                                                  , if fieldInfo.readOnly then [Textfield.disabled] else []
-                                                  ])
-                              ]
-                , Table.td [] (List.map text (Maybe.withDefault [] (Dict.get name model.formErrors)))
-                ]
-
 view : Model -> Html Msg
 view model =
-  div []
-    (List.concat
-    [ [ h2 [] [text "Question model information"]
-      , Table.table [] (List.map2 (tableItemView model) model.fieldInfos [1 .. List.length model.fieldInfos])
-      ]
-    , if model.preloader then [Loading.spinner [Loading.active model.preloader]] else [
-        Button.render MDL [0] model.mdl
-          [ Button.raised
-          , Button.onClick SubmitForm ]
-          [text "Submit"]
-        ]
-    ])
+  if model.preloader
+    then Loading.spinner [Loading.active model.preloader]
+    else App.map FormMsg (Form.view model.form)
   |> Material.Scheme.top
 
 
@@ -146,35 +107,11 @@ subscriptions model =
 
 getQustionInfo : Cmd Msg
 getQustionInfo =
-  Task.perform FetchFail FetchSucceed getQustionInfoTask
+  getFormInfoTask "http://localhost:8000/poll/question/"
+    |> Task.perform FetchFail FetchSucceed
 
-getQustionInfoTask : Task.Task (HttpBuilder.Error String) (HttpBuilder.Response Form.FormInfo)
-getQustionInfoTask =
-  HttpBuilder.options "http://localhost:8000/poll/question/"
-    |> HttpBuilder.send (HttpBuilder.jsonReader questionOptionDecoder) HttpBuilder.stringReader
 
-questionOptionDecoder : Decode.Decoder Form.FormInfo
-questionOptionDecoder =
-    Decode.at ["actions", "POST"] (Decode.keyValuePairs Form.fieldInfoDecoder)
-
-sendQuestionToServer : Form.FormData -> Cmd Msg
+sendQuestionToServer : FormData.FormData -> Cmd Msg
 sendQuestionToServer data =
-  Task.perform UploadFail UploadSucceed (sendQuestionToServerTask data)
-
-
-sendQuestionToServerTask : Form.FormData -> Task.Task (HttpBuilder.Error Form.FormErrors) (HttpBuilder.Response String)
-sendQuestionToServerTask data =
-  HttpBuilder.post "http://localhost:8000/poll/question/"
-    |> HttpBuilder.withJsonBody (encodeFormData data)
-    |> HttpBuilder.withHeader "Content-Type" "application/json"
-    |> HttpBuilder.send HttpBuilder.stringReader (HttpBuilder.jsonReader (Decode.dict (Decode.list Decode.string)))
-
---wrapValues :
-wrapValues : (String, String) -> (String, Encode.Value)
-wrapValues (k,v) =
-  (k, Encode.string v)
-
-encodeFormData : Form.FormData -> Encode.Value
-encodeFormData data =
-  List.map wrapValues (Dict.toList data)
-  |> Encode.object
+  sendFormToServerTask "http://localhost:8000/poll/question/" data
+    |> Task.perform UploadFail UploadSucceed
