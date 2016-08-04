@@ -1,13 +1,13 @@
-module Form.Form exposing
-  ( Model
-  , setFormErrors
-  , setFormInfo
-  , clenup
-  , init
-  , Msg(..)
-  , update
-  , view
-  )
+module Form.Form
+    exposing
+        ( Model
+        , Msg
+        , setFormErrors
+        , cleanup
+        , init
+        , update
+        , view
+        )
 
 import Html exposing (..)
 import Form.Data as FormData
@@ -18,69 +18,72 @@ import Material.Button as Button exposing (..)
 import Dict
 import List
 
+
 type alias Model =
-  { formInfo : FormData.FormInfo
-  , mdl: Material.Model
-  , formData: FormData.FormData
-  , formErrors: FormData.FormErrors
-  }
+    { mdl : Material.Model
+    , formData : FormData.FormData
+    , formErrors : FormData.FormErrors
+    }
 
 
-setFormInfo model formInfo = {model | formInfo = formInfo}
-setFormErrors model formErrors = {model | formErrors = formErrors}
-clenup model = {model | formData = Dict.empty, formErrors = Dict.empty}
+setFormErrors model formErrors =
+    { model | formErrors = formErrors }
+
+
+cleanup model =
+    { model | formData = Dict.empty, formErrors = Dict.empty }
 
 
 init : Model
 init =
-  { formInfo = []
-  , mdl = Material.model
-  , formData = Dict.empty
-  , formErrors = Dict.empty
-  }
+    { mdl = Material.model
+    , formData = Dict.empty
+    , formErrors = Dict.empty
+    }
 
 
 type Msg
-  = MDL (Material.Msg Msg)
-  | UserInput String String
-  | SubmitForm
+    = MDL (Material.Msg Msg)
+    | UserInput String String
 
-type Cmd
-  = NoOp
-  | SubmitFormDone
 
 update : Msg -> Model -> Model
 update msg model =
-  case msg of
-    MDL action' ->
-      Material.update action' model |> fst
-    UserInput key data ->
-      { model | formData = Dict.insert key data model.formData }
-    SubmitForm -> model
+    case msg of
+        MDL action' ->
+            Material.update action' model |> fst
+
+        UserInput key data ->
+            { model | formData = Dict.insert key data model.formData }
 
 
-tableItemView : Model -> (String, FormData.FieldInfo) -> Int -> Html Msg
-tableItemView model (name, fieldInfo) index =
-    Table.tr [] [ Table.td [] [text fieldInfo.label]
-                , Table.td [] [Textfield.render MDL [index] model.mdl
-                                                (List.concat
-                                                  [ [ Textfield.label fieldInfo.label
-                                                    , Textfield.value (Maybe.withDefault "" (Dict.get name model.formData))
-                                                    , Textfield.onInput (UserInput name)
-                                                    ]
-                                                  , if fieldInfo.readOnly then [Textfield.disabled] else []
-                                                  ])
-                              ]
-                , Table.td [] (List.map text (Maybe.withDefault [] (Dict.get name model.formErrors)))
-                ]
+tableItemView : Model -> ( String, FormData.FieldInfo ) -> Int -> Html Msg
+tableItemView model ( name, fieldInfo ) index =
+    Table.tr []
+        [ Table.td [] [ text fieldInfo.label ]
+        , Table.td []
+            [ Textfield.render MDL
+                [ index ]
+                model.mdl
+                (List.concat
+                    [ [ Textfield.label fieldInfo.label
+                      , Textfield.value (Maybe.withDefault "" (Dict.get name model.formData))
+                      , Textfield.onInput (UserInput name)
+                      ]
+                    , if fieldInfo.readOnly then
+                        [ Textfield.disabled ]
+                      else
+                        []
+                    ]
+                )
+            ]
+        , Table.td [] (List.map text (Maybe.withDefault [] (Dict.get name model.formErrors)))
+        ]
 
-view : Model -> Html Msg
-view model =
-  div []
-      [ h2 [] [text "Question model information"]
-      , Table.table [] (List.map2 (tableItemView model) model.formInfo [1 .. List.length model.formInfo])
-      , Button.render MDL [0] model.mdl
-          [ Button.raised
-          , Button.onClick SubmitForm ]
-          [text "Submit"]
-      ]
+
+view : FormData.FormInfo -> Model -> Html Msg
+view formInfo model =
+    div []
+        [ h2 [] [ text "Question model information" ]
+        , Table.table [] (List.map2 (tableItemView model) formInfo [1..List.length formInfo])
+        ]
