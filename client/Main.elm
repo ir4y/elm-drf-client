@@ -61,7 +61,7 @@ init =
 
 type Msg
   = NoOp
-  | MDL Material.Msg
+  | MDL (Material.Msg Msg)
   | UserInput String String
   | FetchFail Http.Error
   | FetchSucceed (List (String, FormField.FieldInfo))
@@ -76,7 +76,7 @@ update msg model =
     NoOp ->
       (model, Cmd.none)
     MDL action' ->
-      Material.update MDL action' model
+      Material.update action' model
     FetchSucceed fieldInfos ->
       ({ model | fieldInfos = fieldInfos, preloader = False } , Cmd.none)
     FetchFail error ->
