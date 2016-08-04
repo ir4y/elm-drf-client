@@ -5,7 +5,7 @@ import Html.Events exposing (..)
 import HttpBuilder
 import Json.Decode as Decode
 import Json.Encode as Encode
-import FormField
+import Form
 import Dict
 import Material
 import Material.Scheme
@@ -34,10 +34,10 @@ main =
 
 
 type alias Model =
-  { fieldInfos : List (String, FormField.FieldInfo)
+  { fieldInfos : Form.FormInfo
   , mdl: Material.Model
-  , formData: Dict.Dict String String
-  , formErrors: Dict.Dict String (List String)
+  , formData: Form.FormData
+  , formErrors: Form.FormErrors
   , preloader: Bool
   }
 
@@ -62,8 +62,8 @@ type Msg
   | MDL (Material.Msg Msg)
   | UserInput String String
   | FetchFail (HttpBuilder.Error String)
-  | FetchSucceed (HttpBuilder.Response (List (String, FormField.FieldInfo)))
-  | UploadFail (HttpBuilder.Error (Dict.Dict String (List String)))
+  | FetchSucceed (HttpBuilder.Response Form.FormInfo)
+  | UploadFail (HttpBuilder.Error Form.FormErrors)
   | UploadSucceed (HttpBuilder.Response String)
   | SubmitForm
 
@@ -99,6 +99,8 @@ update msg model =
 
 -- VIEW
 
+
+tableItemView : Model -> (String, Form.FieldInfo) -> Int -> Html Msg
 tableItemView model (name, fieldInfo) index =
     Table.tr [] [ Table.td [] [text fieldInfo.label]
                 , Table.td [] [Textfield.render MDL [index] model.mdl
@@ -141,31 +143,38 @@ subscriptions model =
 
 
 -- HTTP
+
+getQustionInfo : Cmd Msg
 getQustionInfo =
   Task.perform FetchFail FetchSucceed getQustionInfoTask
 
+getQustionInfoTask : Task.Task (HttpBuilder.Error String) (HttpBuilder.Response Form.FormInfo)
 getQustionInfoTask =
   HttpBuilder.options "http://localhost:8000/poll/question/"
     |> HttpBuilder.send (HttpBuilder.jsonReader questionOptionDecoder) HttpBuilder.stringReader
 
-questionOptionDecoder : Decode.Decoder (List (String, FormField.FieldInfo))
+questionOptionDecoder : Decode.Decoder Form.FormInfo
 questionOptionDecoder =
-    Decode.at ["actions", "POST"] (Decode.keyValuePairs FormField.fieldInfoDecoder)
+    Decode.at ["actions", "POST"] (Decode.keyValuePairs Form.fieldInfoDecoder)
 
---sendQuestionToServer : (Dict.Dict String String) ->
+sendQuestionToServer : Form.FormData -> Cmd Msg
 sendQuestionToServer data =
   Task.perform UploadFail UploadSucceed (sendQuestionToServerTask data)
 
 
---sendQuestionToServer : (Dict.Dict String String) -> (HttpBuilder.BodyReader String) -> (HttpBuilder.BodyReader (
+sendQuestionToServerTask : Form.FormData -> Task.Task (HttpBuilder.Error Form.FormErrors) (HttpBuilder.Response String)
 sendQuestionToServerTask data =
   HttpBuilder.post "http://localhost:8000/poll/question/"
-    |> HttpBuilder.withJsonBody (Encode.object (encodeData data))
+    |> HttpBuilder.withJsonBody (encodeFormData data)
     |> HttpBuilder.withHeader "Content-Type" "application/json"
     |> HttpBuilder.send HttpBuilder.stringReader (HttpBuilder.jsonReader (Decode.dict (Decode.list Decode.string)))
 
+--wrapValues :
+wrapValues : (String, String) -> (String, Encode.Value)
 wrapValues (k,v) =
   (k, Encode.string v)
 
-encodeData data =
+encodeFormData : Form.FormData -> Encode.Value
+encodeFormData data =
   List.map wrapValues (Dict.toList data)
+  |> Encode.object
