@@ -92,7 +92,13 @@ update msg model =
             ( { model | preloader = False }, Cmd.none )
 
         UploadSucceed response ->
-            ( { model | form = Form.cleanup model.form, preloader = False }, Cmd.none )
+            ( { model
+                | form = Form.cleanup model.form
+                , formErrors = FormTypes.emptyFormErrors
+                , preloader = False
+              }
+            , Cmd.none
+            )
 
         UploadFail error ->
             let
