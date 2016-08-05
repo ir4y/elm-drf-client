@@ -8,6 +8,7 @@ import HttpBuilder
 import Form.Types as FormTypes
 import Form.Form as Form
 import Form.Services exposing (..)
+import Form.Validate as Validate
 import Material
 import Material.Scheme
 import Material.Button as Button
@@ -33,6 +34,8 @@ type alias Model =
     , form : Form.Model
     , formInfo : FormTypes.FormInfo
     , preloader : Bool
+    , validate : FormTypes.FormData -> FormTypes.FormErrors
+    , formErrors : FormTypes.FormErrors
     }
 
 
@@ -42,6 +45,8 @@ init =
       , form = Form.init
       , formInfo = []
       , preloader = True
+      , validate = (\_ -> FormTypes.emptyFormErrors)
+      , formErrors = FormTypes.emptyFormErrors
       }
     , getQustionInfo
     )
@@ -68,10 +73,20 @@ update msg model =
             Material.update action' model
 
         FormMsg msg' ->
-            ( { model | form = Form.update msg' model.form }, Cmd.none )
+            ( { model | form = Form.update model.validate msg' model.form }, Cmd.none )
 
         FetchSucceed response ->
-            ( { model | formInfo = response.data, preloader = False }, Cmd.none )
+            let
+                validate =
+                    Validate.getValidator response.data
+            in
+                ( { model
+                    | formInfo = response.data
+                    , validate = validate
+                    , preloader = False
+                  }
+                , Cmd.none
+                )
 
         FetchFail error ->
             ( { model | preloader = False }, Cmd.none )
@@ -82,7 +97,7 @@ update msg model =
         UploadFail error ->
             let
                 model' =
-                    { model | preloader = False }
+                    { model | preloader = False, form = Form.cleanDirtyState model.form }
             in
                 case error of
                     HttpBuilder.UnexpectedPayload _ ->
@@ -95,7 +110,7 @@ update msg model =
                         ( model', Cmd.none )
 
                     HttpBuilder.BadResponse response ->
-                        ( { model' | form = Form.setFormErrors model'.form response.data }, Cmd.none )
+                        ( { model' | formErrors = response.data }, Cmd.none )
 
         SubmitForm ->
             ( { model | preloader = True }, sendQuestionToServer model.form.formData )
@@ -108,7 +123,7 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ App.map FormMsg (Form.view model.formInfo model.form)
+        [ App.map FormMsg (Form.view model.formInfo model.formErrors model.form)
         , if model.preloader then
             Loading.spinner [ Loading.active model.preloader ]
           else
