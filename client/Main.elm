@@ -5,17 +5,13 @@ import Html.App as App
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import HttpBuilder
-import Form.Data as FormData
+import Form.Types as FormTypes
 import Form.Form as Form
-import Form.Http exposing (..)
-import Dict
+import Form.Services exposing (..)
 import Material
 import Material.Scheme
-import Material.Table as Table
-import Material.Textfield as Textfield
-import Material.Button as Button exposing (..)
+import Material.Button as Button
 import Material.Spinner as Loading
-import Maybe
 import Task
 
 
@@ -35,7 +31,7 @@ main =
 type alias Model =
     { mdl : Material.Model
     , form : Form.Model
-    , formInfo : FormData.FormInfo
+    , formInfo : FormTypes.FormInfo
     , preloader : Bool
     }
 
@@ -59,8 +55,8 @@ type Msg
     = MDL (Material.Msg Msg)
     | FormMsg Form.Msg
     | FetchFail (HttpBuilder.Error String)
-    | FetchSucceed (HttpBuilder.Response FormData.FormInfo)
-    | UploadFail (HttpBuilder.Error FormData.FormErrors)
+    | FetchSucceed (HttpBuilder.Response FormTypes.FormInfo)
+    | UploadFail (HttpBuilder.Error FormTypes.FormErrors)
     | UploadSucceed (HttpBuilder.Response String)
     | SubmitForm
 
@@ -146,7 +142,7 @@ getQustionInfo =
         |> Task.perform FetchFail FetchSucceed
 
 
-sendQuestionToServer : FormData.FormData -> Cmd Msg
+sendQuestionToServer : FormTypes.FormData -> Cmd Msg
 sendQuestionToServer data =
     sendFormToServerTask "http://localhost:8000/poll/question/" data
         |> Task.perform UploadFail UploadSucceed

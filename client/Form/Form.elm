@@ -10,19 +10,18 @@ module Form.Form
         )
 
 import Html exposing (..)
-import Form.Data as FormData
+import Form.Types as FormTypes
 import Material
 import Material.Table as Table
 import Material.Textfield as Textfield
 import Material.Button as Button exposing (..)
 import Dict
-import List
 
 
 type alias Model =
     { mdl : Material.Model
-    , formData : FormData.FormData
-    , formErrors : FormData.FormErrors
+    , formData : FormTypes.FormData
+    , formErrors : FormTypes.FormErrors
     }
 
 
@@ -31,14 +30,14 @@ setFormErrors model formErrors =
 
 
 cleanup model =
-    { model | formData = Dict.empty, formErrors = Dict.empty }
+    { model | formData = FormTypes.emptyFormData, formErrors = FormTypes.emptyFormErrors }
 
 
 init : Model
 init =
     { mdl = Material.model
-    , formData = Dict.empty
-    , formErrors = Dict.empty
+    , formData = FormTypes.emptyFormData
+    , formErrors = FormTypes.emptyFormErrors
     }
 
 
@@ -57,7 +56,7 @@ update msg model =
             { model | formData = Dict.insert key data model.formData }
 
 
-tableItemView : Model -> ( String, FormData.FieldInfo ) -> Int -> Html Msg
+tableItemView : Model -> ( String, FormTypes.FieldInfo ) -> Int -> Html Msg
 tableItemView model ( name, fieldInfo ) index =
     Table.tr []
         [ Table.td [] [ text fieldInfo.label ]
@@ -81,7 +80,7 @@ tableItemView model ( name, fieldInfo ) index =
         ]
 
 
-view : FormData.FormInfo -> Model -> Html Msg
+view : FormTypes.FormInfo -> Model -> Html Msg
 view formInfo model =
     div []
         [ h2 [] [ text "Question model information" ]
