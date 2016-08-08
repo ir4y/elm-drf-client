@@ -121,6 +121,6 @@ tableItemView formErrors model ( name, fieldInfo ) index =
 view : FormTypes.FormInfo -> FormTypes.FormErrors -> Model -> Html Msg
 view formInfo formErrors model =
     div []
-        [ h2 [] [ text "Question model information" ]
+        [ h2 [] [ text "Form" ]
         , Table.table [] (List.map2 (tableItemView formErrors model) formInfo [1..List.length formInfo])
         ]
