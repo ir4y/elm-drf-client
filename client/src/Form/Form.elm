@@ -9,7 +9,7 @@ module Form.Form
         , view
         )
 
-import Html exposing (..)
+import Html exposing (Html, text)
 import Form.Types as FormTypes
 import Form.Validate as Validate
 import Material
@@ -120,7 +120,4 @@ tableItemView formErrors model ( name, fieldInfo ) index =
 
 view : FormTypes.FormInfo -> FormTypes.FormErrors -> Model -> Html Msg
 view formInfo formErrors model =
-    div []
-        [ h2 [] [ text "Form" ]
-        , Table.table [] (List.map2 (tableItemView formErrors model) formInfo [1..List.length formInfo])
-        ]
+    Table.table [] (List.map2 (tableItemView formErrors model) formInfo [1..List.length formInfo])

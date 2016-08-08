@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import Html exposing (Html, div)
+import Html exposing (Html, div, h2, text)
 import Html.App as App
 import Form as Form
 import Material.Scheme
@@ -78,7 +78,9 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ App.map QuestionFormMsg (Form.view model.questionForm)
+        [ h2 [] [ text "Questions" ]
+        , App.map QuestionFormMsg (Form.view model.questionForm)
+        , h2 [] [ text "Answers" ]
         , App.map AnswerFormMsg (Form.view model.answerForm)
         ]
         |> Material.Scheme.top
