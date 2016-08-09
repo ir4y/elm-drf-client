@@ -1,16 +1,20 @@
 module Main exposing (..)
 
-import Html exposing (Html, div, h2, text)
+import Html exposing (Html, div, h2, a, text)
+import Html.Attributes exposing (href)
 import Html.App as App
 import Form as Form
 import Material.Scheme
+import Navigation
+import Routing
 
 
 main =
-    App.program
+    Navigation.program Routing.parser
         { init = init
         , view = view
         , update = update
+        , urlUpdate = urlUpdate
         , subscriptions = subscriptions
         }
 
@@ -22,6 +26,7 @@ main =
 type alias Model =
     { questionForm : Form.Model
     , answerForm : Form.Model
+    , route : Routing.Route
     }
 
 
@@ -33,15 +38,33 @@ answer =
     Form.init "http://localhost:8000/poll/answer/"
 
 
-init =
+initModel route =
     ( { questionForm = fst question
       , answerForm = fst answer
+      , route = route
       }
     , Cmd.batch
         [ snd question |> Cmd.map QuestionFormMsg
         , snd answer |> Cmd.map AnswerFormMsg
         ]
     )
+
+
+init result =
+    let
+        currentRoute =
+            Routing.routeFromResult result
+    in
+        initModel currentRoute
+
+
+urlUpdate : Result String Routing.Route -> Model -> ( Model, Cmd Msg )
+urlUpdate result model =
+    let
+        currentRoute =
+            Routing.routeFromResult result
+    in
+        ( { model | route = currentRoute }, Cmd.none )
 
 
 
@@ -77,13 +100,32 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    div []
-        [ h2 [] [ text "Questions" ]
-        , App.map QuestionFormMsg (Form.view model.questionForm)
-        , h2 [] [ text "Answers" ]
-        , App.map AnswerFormMsg (Form.view model.answerForm)
-        ]
-        |> Material.Scheme.top
+    let
+        header =
+            div []
+                [ a [ href "#add/questions" ] [ text "Questions" ]
+                , a [ href "#add/answers" ] [ text "Answers" ]
+                ]
+    in
+        (case model.route of
+            Routing.AddForm "questions" ->
+                div []
+                    [ header
+                    , h2 [] [ text "Questions" ]
+                    , App.map QuestionFormMsg (Form.view model.questionForm)
+                    ]
+
+            Routing.AddForm "answers" ->
+                div []
+                    [ header
+                    , h2 [] [ text "Answers" ]
+                    , App.map AnswerFormMsg (Form.view model.answerForm)
+                    ]
+
+            _ ->
+                header
+        )
+            |> Material.Scheme.top
 
 
 
