@@ -6,15 +6,19 @@ import UrlParser exposing (..)
 
 
 type Route
-    = IndexRoute
-    | AddForm String
+    = Index
+    | List String
+    | Change String Int
+    | Add String
 
 
 matchers : Parser (Route -> a) a
 matchers =
     oneOf
-        [ format IndexRoute (s "")
-        , format AddForm (s "add" </> string)
+        [ format Index (s "")
+        , format List string
+        , format Change (string </> int </> (s "change"))
+        , format Add (string </> (s "add"))
         ]
 
 
@@ -37,4 +41,4 @@ routeFromResult result =
             route
 
         Err string ->
-            IndexRoute
+            Index

@@ -7,6 +7,12 @@ import Form as Form
 import Material.Scheme
 import Navigation
 import Routing
+import Dict
+import Services exposing (getResourcesInfoTask)
+import HttpBuilder
+import Maybe
+import Task
+import Debug
 
 
 main =
@@ -23,39 +29,39 @@ main =
 -- MODEL
 
 
+type alias PageModel =
+    { url : String
+    , dataList : List (Dict.Dict String String)
+    , form : Form.Model
+    }
+
+
+initPageModel : String -> ( PageModel, Cmd Form.Msg )
+initPageModel url =
+    let
+        ( form, cmd ) =
+            Form.init url
+    in
+        ( { url = url
+          , dataList = []
+          , form = form
+          }
+        , cmd
+        )
+
+
 type alias Model =
-    { questionForm : Form.Model
-    , answerForm : Form.Model
+    { schema : Dict.Dict String PageModel
     , route : Routing.Route
     }
 
 
-question =
-    Form.init "http://localhost:8000/poll/question/"
-
-
-answer =
-    Form.init "http://localhost:8000/poll/answer/"
-
-
-initModel route =
-    ( { questionForm = fst question
-      , answerForm = fst answer
-      , route = route
+init routeResult =
+    ( { schema = Dict.empty
+      , route = Routing.routeFromResult routeResult
       }
-    , Cmd.batch
-        [ snd question |> Cmd.map QuestionFormMsg
-        , snd answer |> Cmd.map AnswerFormMsg
-        ]
+    , getQustionInfo
     )
-
-
-init result =
-    let
-        currentRoute =
-            Routing.routeFromResult result
-    in
-        initModel currentRoute
 
 
 urlUpdate : Result String Routing.Route -> Model -> ( Model, Cmd Msg )
@@ -72,29 +78,61 @@ urlUpdate result model =
 
 
 type Msg
-    = QuestionFormMsg Form.Msg
-    | AnswerFormMsg Form.Msg
+    = FormMsg String Form.Msg
+    | FetchFail (HttpBuilder.Error String)
+    | FetchSucceed (HttpBuilder.Response (Dict.Dict String String))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        QuestionFormMsg msg' ->
+        FormMsg name msg' ->
             let
-                action =
-                    Form.update msg' model.questionForm
+                maybePageModel =
+                    Dict.get name model.schema
+
+                result =
+                    case maybePageModel of
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                        Just pageModel ->
+                            let
+                                ( form', cmd' ) =
+                                    Form.update msg' pageModel.form
+
+                                pageModel' =
+                                    { pageModel | form = form' }
+
+                                schema =
+                                    Dict.insert name pageModel' model.schema
+                            in
+                                ( { model | schema = schema }, cmd' |> Cmd.map (FormMsg name) )
             in
-                ( { model | questionForm = fst action }, snd action |> Cmd.map QuestionFormMsg )
+                result
 
-        AnswerFormMsg msg' ->
-            let
-                action =
-                    Form.update msg' model.answerForm
-            in
-                ( { model | answerForm = fst action }, snd action |> Cmd.map AnswerFormMsg )
+        FetchSucceed response ->
+            ( { model | schema = Dict.map (\key value -> fst (initPageModel value)) response.data }, Cmd.none )
 
+        _ ->
+            ( model, Cmd.none )
 
 
+
+--update msg model =
+--case msg of
+--QuestionFormMsg msg' ->
+--let
+--action =
+--Form.update msg' model.questionForm
+--in
+--( { model | questionForm = fst action }, snd action |> Cmd.map QuestionFormMsg )
+--AnswerFormMsg msg' ->
+--let
+--action =
+--Form.update msg' model.answerForm
+--in
+--( { model | answerForm = fst action }, snd action |> Cmd.map AnswerFormMsg )
 -- VIEW
 
 
@@ -103,35 +141,65 @@ view model =
     let
         header =
             div []
-                [ a [ href "#add/questions" ] [ text "Questions" ]
-                , a [ href "#add/answers" ] [ text "Answers" ]
-                ]
+                (List.map
+                    (\path -> a [ href ("#" ++ path) ] [ text path ])
+                    (Dict.keys model.schema)
+                )
+
+        formView =
+            case Debug.log "route" model.route of
+                Routing.List name ->
+                    let
+                        maybePageModel =
+                            Debug.log "page" (Dict.get name model.schema)
+                    in
+                        case maybePageModel of
+                            Nothing ->
+                                div [] []
+
+                            Just page ->
+                                App.map (FormMsg name) (Form.view page.form)
+
+                _ ->
+                    div [] []
     in
-        (case model.route of
-            Routing.AddForm "questions" ->
-                div []
-                    [ header
-                    , h2 [] [ text "Questions" ]
-                    , App.map QuestionFormMsg (Form.view model.questionForm)
-                    ]
-
-            Routing.AddForm "answers" ->
-                div []
-                    [ header
-                    , h2 [] [ text "Answers" ]
-                    , App.map AnswerFormMsg (Form.view model.answerForm)
-                    ]
-
-            _ ->
-                header
-        )
-            |> Material.Scheme.top
+        div [] [ header, formView ] |> Material.Scheme.top
 
 
 
+--let
+--header =
+--div []
+--[ a [ href "#questions" ] [ text "Questions" ]
+--, a [ href "#answers" ] [ text "Answers" ]
+--]
+--in
+--(case model.route of
+--Routing.List "questions" ->
+--div []
+--[ header
+--, h2 [] [ text "Questions" ]
+--, App.map QuestionFormMsg (Form.view model.questionForm)
+--]
+--Routing.List "answers" ->
+--div []
+--[ header
+--, h2 [] [ text "Answers" ]
+--, App.map AnswerFormMsg (Form.view model.answerForm)
+--]
+--_ ->
+--header
+--)
+--|> Material.Scheme.top
 -- SUBSCRIPTIONS
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.none
+
+
+getQustionInfo : Cmd Msg
+getQustionInfo =
+    getResourcesInfoTask "http://localhost:8000/poll/"
+        |> Task.perform FetchFail FetchSucceed

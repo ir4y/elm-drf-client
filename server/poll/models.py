@@ -23,7 +23,7 @@ class Answer(models.Model):
     order = models.PositiveIntegerField()
 
     def __str__(self):
-        return self.title
+        return self.text
 
     class Meta:
         ordering = ('order', )
