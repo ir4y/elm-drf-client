@@ -112,7 +112,13 @@ update msg model =
                 result
 
         FetchSucceed response ->
-            ( { model | schema = Dict.map (\key value -> fst (initPageModel value)) response.data }, Cmd.none )
+            let initSchema = Dict.map (\key value -> initPageModel value) response.data
+                schema = Dict.map (\key value -> fst value) initSchema
+                cmds = Dict.map (\key value ->  Cmd.map (FormMsg  key) (snd value)) initSchema
+                  |> Dict.values
+                  |> Cmd.batch
+            in
+              ( { model | schema = schema }, cmds )
 
         _ ->
             ( model, Cmd.none )
