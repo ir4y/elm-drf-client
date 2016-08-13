@@ -12,7 +12,6 @@ import Services exposing (getResourcesInfoTask)
 import HttpBuilder
 import Maybe
 import Task
-import Debug
 
 
 main =
@@ -124,21 +123,6 @@ update msg model =
             ( model, Cmd.none )
 
 
-
---update msg model =
---case msg of
---QuestionFormMsg msg' ->
---let
---action =
---Form.update msg' model.questionForm
---in
---( { model | questionForm = fst action }, snd action |> Cmd.map QuestionFormMsg )
---AnswerFormMsg msg' ->
---let
---action =
---Form.update msg' model.answerForm
---in
---( { model | answerForm = fst action }, snd action |> Cmd.map AnswerFormMsg )
 -- VIEW
 
 
@@ -148,16 +132,16 @@ view model =
         header =
             div []
                 (List.map
-                    (\path -> a [ href ("#" ++ path) ] [ text path ])
+                    (\path -> a [ href ("#" ++ path ++ "/add") ] [ text path ])
                     (Dict.keys model.schema)
                 )
 
         formView =
-            case Debug.log "route" model.route of
-                Routing.List name ->
+            case model.route of
+                Routing.Add name ->
                     let
                         maybePageModel =
-                            Debug.log "page" (Dict.get name model.schema)
+                            Dict.get name model.schema
                     in
                         case maybePageModel of
                             Nothing ->
@@ -172,31 +156,6 @@ view model =
         div [] [ header, formView ] |> Material.Scheme.top
 
 
-
---let
---header =
---div []
---[ a [ href "#questions" ] [ text "Questions" ]
---, a [ href "#answers" ] [ text "Answers" ]
---]
---in
---(case model.route of
---Routing.List "questions" ->
---div []
---[ header
---, h2 [] [ text "Questions" ]
---, App.map QuestionFormMsg (Form.view model.questionForm)
---]
---Routing.List "answers" ->
---div []
---[ header
---, h2 [] [ text "Answers" ]
---, App.map AnswerFormMsg (Form.view model.answerForm)
---]
---_ ->
---header
---)
---|> Material.Scheme.top
 -- SUBSCRIPTIONS
 
 

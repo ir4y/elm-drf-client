@@ -4,7 +4,6 @@ import String
 import Navigation
 import UrlParser exposing (..)
 
-
 type Route
     = Index
     | List String
@@ -16,9 +15,9 @@ matchers : Parser (Route -> a) a
 matchers =
     oneOf
         [ format Index (s "")
-        , format List string
         , format Change (string </> int </> (s "change"))
         , format Add (string </> (s "add"))
+        , format List string
         ]
 
 
