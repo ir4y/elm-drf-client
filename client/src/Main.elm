@@ -1,9 +1,9 @@
 module Main exposing (..)
 
-import Html exposing (Html, div, h2, a, text)
+import Html exposing (..)
 import Html.Attributes exposing (href)
 import Html.App as App
-import Form as Form
+import Form
 import Material.Scheme
 import Navigation
 import Routing
@@ -111,16 +111,23 @@ update msg model =
                 result
 
         FetchSucceed response ->
-            let initSchema = Dict.map (\key value -> initPageModel value) response.data
-                schema = Dict.map (\key value -> fst value) initSchema
-                cmds = Dict.map (\key value ->  Cmd.map (FormMsg  key) (snd value)) initSchema
-                  |> Dict.values
-                  |> Cmd.batch
+            let
+                initSchema =
+                    Dict.map (\key value -> initPageModel value) response.data
+
+                schema =
+                    Dict.map (\key value -> fst value) initSchema
+
+                cmds =
+                    Dict.map (\key value -> Cmd.map (FormMsg key) (snd value)) initSchema
+                        |> Dict.values
+                        |> Cmd.batch
             in
-              ( { model | schema = schema }, cmds )
+                ( { model | schema = schema }, cmds )
 
         _ ->
             ( model, Cmd.none )
+
 
 
 -- VIEW
@@ -131,29 +138,42 @@ view model =
     let
         header =
             div []
-                (List.map
-                    (\path -> a [ href ("#" ++ path ++ "/add") ] [ text path ])
-                    (Dict.keys model.schema)
+                (List.concat
+                    [ (List.map
+                        (\path -> a [ href ("#" ++ path) ] [ text (path ++ " ") ])
+                        (Dict.keys model.schema)
+                      )
+                    , [ br [] [] ]
+                    , (List.map
+                        (\path -> a [ href ("#" ++ path ++ "/add") ] [ text ("add " ++ " " ++ path ++ " ") ])
+                        (Dict.keys model.schema)
+                      )
+                    ]
                 )
 
         formView =
             case model.route of
                 Routing.Add name ->
-                    let
-                        maybePageModel =
-                            Dict.get name model.schema
-                    in
-                        case maybePageModel of
-                            Nothing ->
-                                div [] []
-
-                            Just page ->
-                                App.map (FormMsg name) (Form.view page.form)
+                    get_view_or_empy_div name
+                        (Dict.get name model.schema)
+                        (FormMsg name)
+                        (\page -> Form.view page.form)
 
                 _ ->
                     div [] []
     in
         div [] [ header, formView ] |> Material.Scheme.top
+
+
+get_view_or_empy_div : String -> Maybe PageModel -> (m -> Msg) -> (PageModel -> Html m) -> Html Msg
+get_view_or_empy_div name maybePageModel msgWrap view =
+    case maybePageModel of
+        Nothing ->
+            div [] []
+
+        Just page ->
+            (App.map msgWrap (view page))
+
 
 
 -- SUBSCRIPTIONS
