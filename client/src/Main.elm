@@ -86,29 +86,13 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         FormMsg name msg' ->
-            let
-                maybePageModel =
-                    Dict.get name model.schema
-
-                result =
-                    case maybePageModel of
-                        Nothing ->
-                            ( model, Cmd.none )
-
-                        Just pageModel ->
-                            let
-                                ( form', cmd' ) =
-                                    Form.update msg' pageModel.form
-
-                                pageModel' =
-                                    { pageModel | form = form' }
-
-                                schema =
-                                    Dict.insert name pageModel' model.schema
-                            in
-                                ( { model | schema = schema }, cmd' |> Cmd.map (FormMsg name) )
-            in
-                result
+            apply_update_or_noting model
+                name
+                msg'
+                Form.update
+                .form
+                (\pageModel form -> { pageModel | form = form })
+                (FormMsg name)
 
         FetchSucceed response ->
             let
@@ -127,6 +111,25 @@ update msg model =
 
         _ ->
             ( model, Cmd.none )
+
+
+apply_update_or_noting model name msg' update getSubState setSubState msgWrap =
+    case (Dict.get name model.schema) of
+        Nothing ->
+            ( model, Cmd.none )
+
+        Just pageModel ->
+            let
+                ( newSubState, cmd' ) =
+                    update msg' (getSubState pageModel)
+
+                pageModel' =
+                    setSubState pageModel newSubState
+
+                schema =
+                    Dict.insert name pageModel' model.schema
+            in
+                ( { model | schema = schema }, cmd' |> Cmd.map msgWrap )
 
 
 
