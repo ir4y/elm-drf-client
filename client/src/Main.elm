@@ -12,6 +12,7 @@ import Services exposing (getResourcesInfoTask)
 import HttpBuilder
 import Maybe
 import Task
+import ItemList
 
 
 main =
@@ -78,6 +79,7 @@ urlUpdate result model =
 
 type Msg
     = FormMsg String Form.Msg
+    | ListMsg String ItemList.Msg
     | FetchFail (HttpBuilder.Error String)
     | FetchSucceed (HttpBuilder.Response (Dict.Dict String String))
 
@@ -93,6 +95,15 @@ update msg model =
                 .form
                 (\pageModel form -> { pageModel | form = form })
                 (FormMsg name)
+
+        ListMsg name msg' ->
+            apply_update_or_noting model
+                name
+                msg'
+                ItemList.update
+                .dataList
+                (\pageModel dataList -> { pageModel | dataList = dataList })
+                (ListMsg name)
 
         FetchSucceed response ->
             let
@@ -161,6 +172,12 @@ view model =
                         (Dict.get name model.schema)
                         (FormMsg name)
                         (\page -> Form.view page.form)
+
+                Routing.List name ->
+                    get_view_or_empy_div
+                        (Dict.get name model.schema)
+                        (ListMsg name)
+                        (\page -> ItemList.view page.dataList)
 
                 _ ->
                     div [] []
