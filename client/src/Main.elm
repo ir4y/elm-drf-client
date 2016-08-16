@@ -8,7 +8,7 @@ import Material.Scheme
 import Navigation
 import Routing
 import Dict
-import Services exposing (getResourcesInfoTask)
+import Services exposing (getResourcesInfoTask, getResourceTask)
 import HttpBuilder
 import Maybe
 import Task
@@ -69,8 +69,21 @@ urlUpdate result model =
     let
         currentRoute =
             Routing.routeFromResult result
+
+        cmd =
+            case currentRoute of
+                Routing.List name ->
+                    case Dict.get name model.schema of
+                        Nothing ->
+                            Cmd.none
+
+                        Just pageModel ->
+                            getResource name pageModel.url
+
+                _ ->
+                    Cmd.none
     in
-        ( { model | route = currentRoute }, Cmd.none )
+        ( { model | route = currentRoute }, cmd )
 
 
 
@@ -82,6 +95,8 @@ type Msg
     | ListMsg String ItemList.Msg
     | FetchFail (HttpBuilder.Error String)
     | FetchSucceed (HttpBuilder.Response (Dict.Dict String String))
+    | FetchResourceFail (HttpBuilder.Error String)
+    | FetchResourceSucceed String (HttpBuilder.Response (List (Dict.Dict String String)))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -119,6 +134,24 @@ update msg model =
                         |> Cmd.batch
             in
                 ( { model | schema = schema }, cmds )
+
+        FetchResourceSucceed name response ->
+            case (Dict.get name model.schema) of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just pageModel ->
+                    let
+                        pageModel' =
+                            { pageModel | dataList = response.data }
+
+                        schema' =
+                            Dict.insert name pageModel' model.schema
+
+                        model' =
+                            { model | schema = schema' }
+                    in
+                        ( model', Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -165,7 +198,7 @@ view model =
                     ]
                 )
 
-        formView =
+        subView =
             case model.route of
                 Routing.Add name ->
                     get_view_or_empy_div name
@@ -182,7 +215,7 @@ view model =
                 _ ->
                     div [] []
     in
-        div [] [ header, formView ] |> Material.Scheme.top
+        div [] [ header, subView ] |> Material.Scheme.top
 
 
 get_view_or_empy_div : String -> Maybe PageModel -> (m -> Msg) -> (PageModel -> Html m) -> Html Msg
@@ -208,3 +241,9 @@ getQustionInfo : Cmd Msg
 getQustionInfo =
     getResourcesInfoTask "http://localhost:8000/poll/"
         |> Task.perform FetchFail FetchSucceed
+
+
+getResource : String -> String -> Cmd Msg
+getResource name url =
+    getResourceTask url
+        |> Task.perform FetchResourceFail (FetchResourceSucceed name)

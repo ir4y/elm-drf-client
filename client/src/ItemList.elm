@@ -1,7 +1,10 @@
 module ItemList exposing (Msg, update, view)
 
 import Dict
-import Html exposing (div, h2, text)
+import Debug
+import Material.Table exposing (..)
+import Material.Spinner as Loading
+import Html exposing (text)
 
 
 type Msg
@@ -18,4 +21,32 @@ update msg model =
 
 
 view model =
-    div [] [ text "Element list" ]
+    let
+        maybeHead =
+            List.head model
+    in
+        case maybeHead of
+            Nothing ->
+                Loading.spinner [ Loading.active True ]
+
+            Just head ->
+                table []
+                    [ thead []
+                        [ tr []
+                            (head
+                                |> Dict.keys
+                                |> List.map (\value -> th [] [ text value ])
+                            )
+                        ]
+                    , tbody []
+                        (model
+                            |> List.map
+                                (\item ->
+                                    tr []
+                                        (item
+                                            |> Dict.values
+                                            |> List.map (\value -> td [] [ text value ])
+                                        )
+                                )
+                        )
+                    ]
