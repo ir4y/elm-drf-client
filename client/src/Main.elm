@@ -174,7 +174,7 @@ view model =
                         (\page -> Form.view page.form)
 
                 Routing.List name ->
-                    get_view_or_empy_div
+                    get_view_or_empy_div name
                         (Dict.get name model.schema)
                         (ListMsg name)
                         (\page -> ItemList.view page.dataList)

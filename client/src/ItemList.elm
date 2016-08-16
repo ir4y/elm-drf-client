@@ -1,7 +1,7 @@
 module ItemList exposing (Msg, update, view)
 
 import Dict
-import Html exposing (div)
+import Html exposing (div, h2, text)
 
 
 type Msg
@@ -18,4 +18,4 @@ update msg model =
 
 
 view model =
-    div [] []
+    div [] [ text "Element list" ]
