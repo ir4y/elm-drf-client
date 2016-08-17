@@ -4,15 +4,20 @@ import Html exposing (..)
 import Html.Attributes exposing (href)
 import Html.App as App
 import Form
+import Material
+import Material.Color as Color
 import Material.Scheme
+import Material.Layout as Layout
 import Navigation
 import Routing
+import Navigation
 import Dict
 import Services exposing (getResourcesInfoTask, getResourceTask)
 import HttpBuilder
 import Maybe
 import Task
 import ItemList
+import Array
 
 
 main =
@@ -53,12 +58,14 @@ initPageModel url =
 type alias Model =
     { schema : Dict.Dict String PageModel
     , route : Routing.Route
+    , mdl : Material.Model
     }
 
 
 init routeResult =
     ( { schema = Dict.empty
       , route = Routing.routeFromResult routeResult
+      , mdl = Material.model
       }
     , getQustionInfo
     )
@@ -91,7 +98,9 @@ urlUpdate result model =
 
 
 type Msg
-    = FormMsg String Form.Msg
+    = Mdl (Material.Msg Msg)
+    | SelectTab Int
+    | FormMsg String Form.Msg
     | ListMsg String ItemList.Msg
     | FetchFail (HttpBuilder.Error String)
     | FetchSucceed (HttpBuilder.Response (Dict.Dict String String))
@@ -99,9 +108,27 @@ type Msg
     | FetchResourceSucceed String (HttpBuilder.Response (List (Dict.Dict String String)))
 
 
+getUrlByIndex : Model -> Int -> String
+getUrlByIndex model index =
+    let
+        keys =
+            Dict.keys model.schema |> Array.fromList
+
+        url =
+            Array.get index keys |> Maybe.withDefault ""
+    in
+        "#" ++ url
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        SelectTab tab ->
+            ( model, getUrlByIndex model tab |> Navigation.newUrl )
+
+        Mdl msg' ->
+            Material.update msg' model
+
         FormMsg name msg' ->
             apply_update_or_noting model
                 name
@@ -180,42 +207,84 @@ apply_update_or_noting model name msg' update getSubState setSubState msgWrap =
 -- VIEW
 
 
-view : Model -> Html Msg
+type alias Mdl =
+    Material.Model
+
+
+getIndexByResourceName : Model -> String -> Int
+getIndexByResourceName model resourceName =
+    Dict.keys model.schema
+        |> Array.fromList
+        |> Array.toIndexedList
+        |> List.filter (\( index, name ) -> name == resourceName)
+        |> List.head
+        |> Maybe.withDefault ( -1, "" )
+        |> fst
+
+
+getIndexByRoute : Model -> Int
+getIndexByRoute model =
+    case model.route of
+        Routing.Index ->
+            -1
+
+        Routing.List name ->
+            getIndexByResourceName model name
+
+        Routing.Change name _ ->
+            getIndexByResourceName model name
+
+        Routing.Add name ->
+            getIndexByResourceName model name
+
+
 view model =
     let
-        header =
-            div []
-                (List.concat
-                    [ (List.map
-                        (\path -> a [ href ("#" ++ path) ] [ text (path ++ " ") ])
-                        (Dict.keys model.schema)
-                      )
-                    , [ br [] [] ]
-                    , (List.map
-                        (\path -> a [ href ("#" ++ path ++ "/add") ] [ text ("add " ++ " " ++ path ++ " ") ])
-                        (Dict.keys model.schema)
-                      )
-                    ]
-                )
+        tabTitles =
+            Dict.keys model.schema |> List.map text
+    in
+        Layout.render Mdl
+            model.mdl
+            [ Layout.fixedHeader
+            , Layout.selectedTab (getIndexByRoute model)
+            , Layout.onSelectTab SelectTab
+            ]
+            { header = []
+            , drawer = []
+            , tabs = ( tabTitles, [ Color.background (Color.color Color.Green Color.S400) ] )
+            , main = [ view' model ]
+            }
+            |> Material.Scheme.top
 
-        subView =
+
+view' : Model -> Html Msg
+view' model =
+    let
+        getHeader name =
+            a [ href ("#" ++ name ++ "/add") ] [ text "Add" ]
+
+        ( header, subView ) =
             case model.route of
                 Routing.Add name ->
-                    get_view_or_empy_div name
+                    ( getHeader name
+                    , get_view_or_empy_div name
                         (Dict.get name model.schema)
                         (FormMsg name)
                         (\page -> Form.view page.form)
+                    )
 
                 Routing.List name ->
-                    get_view_or_empy_div name
+                    ( getHeader name
+                    , get_view_or_empy_div name
                         (Dict.get name model.schema)
                         (ListMsg name)
                         (\page -> ItemList.view page.dataList)
+                    )
 
                 _ ->
-                    div [] []
+                    ( div [] [], div [] [] )
     in
-        div [] [ header, subView ] |> Material.Scheme.top
+        div [] [ header, subView ]
 
 
 get_view_or_empy_div : String -> Maybe PageModel -> (m -> Msg) -> (PageModel -> Html m) -> Html Msg
