@@ -251,10 +251,10 @@ view model =
             ]
             { header = []
             , drawer = []
-            , tabs = ( tabTitles, [ Color.background (Color.color Color.Green Color.S400) ] )
+            , tabs = ( tabTitles, [] )
             , main = [ view' model ]
             }
-            |> Material.Scheme.top
+            |> Material.Scheme.topWithScheme Color.Blue Color.LightBlue
 
 
 view' : Model -> Html Msg
