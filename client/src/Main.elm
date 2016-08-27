@@ -8,6 +8,8 @@ import Material
 import Material.Color as Color
 import Material.Scheme
 import Material.Layout as Layout
+import Material.Button as Button
+import Material.Grid as Grid
 import Navigation
 import Routing
 import Navigation
@@ -99,6 +101,7 @@ urlUpdate result model =
 
 type Msg
     = Mdl (Material.Msg Msg)
+    | OpenAddPage String
     | SelectTab Int
     | FormMsg String Form.Msg
     | ListMsg String ItemList.Msg
@@ -123,6 +126,9 @@ getUrlByIndex model index =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        OpenAddPage name ->
+            ( model, Navigation.newUrl <| "#" ++ name ++ "/add" )
+
         SelectTab tab ->
             ( model, getUrlByIndex model tab |> Navigation.newUrl )
 
@@ -261,7 +267,13 @@ view' : Model -> Html Msg
 view' model =
     let
         getHeader name =
-            a [ href ("#" ++ name ++ "/add") ] [ text "Add" ]
+            Button.render Mdl
+                [ 0 ]
+                model.mdl
+                [ Button.raised
+                , Button.onClick (OpenAddPage name)
+                ]
+                [ text <| "Add " ++ name ]
 
         ( header, subView ) =
             case model.route of
@@ -284,7 +296,12 @@ view' model =
                 _ ->
                     ( div [] [], div [] [] )
     in
-        div [] [ header, subView ]
+        div []
+            [ Grid.grid []
+                [ Grid.cell [ Grid.size Grid.All 12 ] [ header ] ]
+            , Grid.grid []
+                [ Grid.cell [ Grid.size Grid.All 12 ] [ subView ] ]
+            ]
 
 
 get_view_or_empy_div : String -> Maybe PageModel -> (m -> Msg) -> (PageModel -> Html m) -> Html Msg
