@@ -85,20 +85,26 @@ urlUpdate result model =
         currentRoute =
             Routing.routeFromResult result
 
+        handleUrlWithParam name =
+            case model.schema of
+                Types.Success schema ->
+                    case Dict.get name schema of
+                        Nothing ->
+                            gotoRoot
+
+                        Just pageModel ->
+                            getResource name pageModel.url
+
+                _ ->
+                    Cmd.none
+
         cmd =
             case currentRoute of
                 Routing.List name ->
-                    case model.schema of
-                        Types.Success schema ->
-                            case Dict.get name schema of
-                                Nothing ->
-                                    Cmd.none
+                    handleUrlWithParam name
 
-                                Just pageModel ->
-                                    getResource name pageModel.url
-
-                        _ ->
-                            Cmd.none
+                Routing.Add name ->
+                    handleUrlWithParam name
 
                 _ ->
                     Cmd.none
@@ -179,10 +185,18 @@ update msg model =
 
                 dataLoadCmds =
                     case model.route of
+                        Routing.Add name ->
+                            case Dict.get name schema of
+                                Nothing ->
+                                    [ gotoRoot ]
+
+                                _ ->
+                                    []
+
                         Routing.List name ->
                             case Dict.get name schema of
                                 Nothing ->
-                                    [ Cmd.none ]
+                                    [ gotoRoot ]
 
                                 Just pageModel ->
                                     [ getResource name pageModel.url ]
@@ -385,6 +399,15 @@ get_view_or_empy_div name maybePageModel msgWrap view =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.none
+
+
+
+-- COMMAND HELPERS
+
+
+gotoRoot : Cmd Msg
+gotoRoot =
+    Navigation.newUrl "#"
 
 
 getQustionInfo : Cmd Msg
