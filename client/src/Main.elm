@@ -67,6 +67,7 @@ type alias Model =
     { schema : Types.RemoteData String Schema
     , route : Routing.Route
     , mdl : Material.Model
+    , editForm : Form.Model
     }
 
 
@@ -74,6 +75,7 @@ init routeResult =
     ( { schema = Types.Loading
       , route = Routing.routeFromResult routeResult
       , mdl = Material.model
+      , editForm = Form.initEmpty
       }
     , getQustionInfo
     )
@@ -108,8 +110,44 @@ urlUpdate result model =
 
                 _ ->
                     Cmd.none
+
+        model' =
+            case currentRoute of
+                Routing.Change name id ->
+                    case model.schema of
+                        Types.Success schema ->
+                            case Dict.get name schema of
+                                Nothing ->
+                                    model
+
+                                Just pageModel ->
+                                    case pageModel.dataList of
+                                        Types.Success dataList ->
+                                            { model
+                                                | editForm =
+                                                    Form.initEditForm
+                                                        (pageModel.form.url ++ (toString id) ++ "/")
+                                                        pageModel.form.formState
+                                                        (dataList
+                                                            |> List.filter
+                                                                (\item ->
+                                                                    (Dict.get "id" item) == (Maybe.Just (toString id))
+                                                                )
+                                                            |> List.head
+                                                            |> Maybe.withDefault (Dict.insert "id" "none" Dict.empty)
+                                                        )
+                                            }
+
+                                        _ ->
+                                            model
+
+                        _ ->
+                            model
+
+                _ ->
+                    model
     in
-        ( { model | route = currentRoute }, cmd )
+        ( { model' | route = currentRoute }, cmd )
 
 
 
@@ -121,6 +159,7 @@ type Msg
     | OpenAddPage String
     | SelectTab Int
     | FormMsg String Form.Msg
+    | EditFormMsg Form.Msg
     | ListMsg String ItemList.Msg
     | FetchFail (HttpBuilder.Error String)
     | FetchSucceed (HttpBuilder.Response (Dict.Dict String String))
@@ -165,6 +204,13 @@ update msg model =
                 .form
                 (\pageModel form -> { pageModel | form = form })
                 (FormMsg name)
+
+        EditFormMsg msg' ->
+            let
+                ( editForm, cmd ) =
+                    Form.update msg' model.editForm
+            in
+                ( { model | editForm = editForm }, Cmd.map EditFormMsg cmd )
 
         ListMsg name msg' ->
             apply_update_or_noting model
@@ -368,7 +414,15 @@ view' schema model =
                     , get_view_or_empy_div name
                         (Dict.get name schema)
                         (ListMsg name)
-                        (\page -> ItemList.view page.dataList)
+                        (\page -> ItemList.view name page.dataList)
+                    )
+
+                Routing.Change name id ->
+                    ( div [] []
+                    , get_view_or_empy_div name
+                        (Dict.get name schema)
+                        EditFormMsg
+                        (\page -> Form.view model.editForm)
                     )
 
                 _ ->

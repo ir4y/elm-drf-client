@@ -3,6 +3,8 @@ module Form
         ( Model
         , Msg
         , init
+        , initEmpty
+        , initEditForm
         , update
         , view
         )
@@ -19,6 +21,7 @@ import Material.Button as Button
 import Material.Spinner as Loading
 import Task
 import Types
+import Dict
 
 
 -- MODEL
@@ -50,8 +53,30 @@ init url =
       , url = url
       , preloader = False
       }
-    , getQustionInfo url
+    , getFormInfo url
     )
+
+
+initEmpty : Model
+initEmpty =
+    { mdl = Material.model
+    , form = Form.init
+    , formState = Types.NotAsked
+    , formErrors = FormTypes.emptyFormErrors
+    , url = ""
+    , preloader = False
+    }
+
+
+initEditForm : String -> FormState -> FormTypes.FormData -> Model
+initEditForm url formState formData =
+    { mdl = Material.model
+    , form = Form.initWithData formData
+    , formState = formState
+    , formErrors = FormTypes.emptyFormErrors
+    , url = url
+    , preloader = False
+    }
 
 
 
@@ -135,7 +160,14 @@ update msg model =
                         ( { model' | formErrors = response.data }, Cmd.none )
 
         SubmitForm ->
-            ( { model | preloader = True }, sendQuestionToServer model.url model.form.formData )
+            ( { model | preloader = True }
+            , case Dict.get "id" model.form.formData of
+                Nothing ->
+                    sendFormToServer model.url model.form.formData
+
+                Just _ ->
+                    updateFormAtServer model.url model.form.formData
+            )
 
 
 
@@ -185,13 +217,19 @@ subscriptions model =
 -- HTTP
 
 
-getQustionInfo : String -> Cmd Msg
-getQustionInfo url =
+getFormInfo : String -> Cmd Msg
+getFormInfo url =
     getFormInfoTask url
         |> Task.perform FetchFail FetchSucceed
 
 
-sendQuestionToServer : String -> FormTypes.FormData -> Cmd Msg
-sendQuestionToServer url data =
+sendFormToServer : String -> FormTypes.FormData -> Cmd Msg
+sendFormToServer url data =
     sendFormToServerTask url data
+        |> Task.perform UploadFail UploadSucceed
+
+
+updateFormAtServer : String -> FormTypes.FormData -> Cmd Msg
+updateFormAtServer url data =
+    updateFormAtServerTask url data
         |> Task.perform UploadFail UploadSucceed

@@ -5,6 +5,7 @@ module Form.Form
         , cleanDirtyState
         , cleanup
         , init
+        , initWithData
         , update
         , view
         )
@@ -45,6 +46,15 @@ init : Model
 init =
     { mdl = Material.model
     , formData = FormTypes.emptyFormData
+    , formErrors = FormTypes.emptyFormErrors
+    , formDirtyState = FormTypes.emptyFormDirtyState
+    }
+
+
+initWithData : FormTypes.FormData -> Model
+initWithData formData =
+    { mdl = Material.model
+    , formData = formData
     , formErrors = FormTypes.emptyFormErrors
     , formDirtyState = FormTypes.emptyFormDirtyState
     }

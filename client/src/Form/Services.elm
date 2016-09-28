@@ -2,6 +2,7 @@ module Form.Services
     exposing
         ( getFormInfoTask
         , sendFormToServerTask
+        , updateFormAtServerTask
         )
 
 import HttpBuilder
@@ -27,6 +28,14 @@ getFormInfoTask url =
 sendFormToServerTask : String -> FormTypes.FormData -> Task.Task (HttpBuilder.Error FormTypes.FormErrors) (HttpBuilder.Response String)
 sendFormToServerTask url data =
     HttpBuilder.post url
+        |> HttpBuilder.withJsonBody (formDataEncoder data)
+        |> HttpBuilder.withHeader "Content-Type" "application/json"
+        |> HttpBuilder.send HttpBuilder.stringReader (HttpBuilder.jsonReader (Decode.dict (Decode.list Decode.string)))
+
+
+updateFormAtServerTask : String -> FormTypes.FormData -> Task.Task (HttpBuilder.Error FormTypes.FormErrors) (HttpBuilder.Response String)
+updateFormAtServerTask url data =
+    HttpBuilder.put url
         |> HttpBuilder.withJsonBody (formDataEncoder data)
         |> HttpBuilder.withHeader "Content-Type" "application/json"
         |> HttpBuilder.send HttpBuilder.stringReader (HttpBuilder.jsonReader (Decode.dict (Decode.list Decode.string)))

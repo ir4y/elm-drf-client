@@ -4,12 +4,19 @@ import Dict
 import Debug
 import Material.Table exposing (..)
 import Material.Spinner as Loading
-import Html exposing (text, div)
+import Html exposing (text, div, a)
+import Html.Attributes exposing (href)
 import Types
+import Maybe
+
+
+type alias Id =
+    String
 
 
 type Msg
     = NoOp
+    | Clicked Id
 
 
 type alias DataList =
@@ -30,7 +37,7 @@ update msg model =
     ( model, Cmd.none )
 
 
-view model =
+view name model =
     case model of
         Types.NotAsked ->
             div [] [ text "not asked yet" ]
@@ -63,11 +70,24 @@ view model =
                                 (dataList
                                     |> List.map
                                         (\item ->
-                                            tr []
-                                                (item
-                                                    |> Dict.values
-                                                    |> List.map (\value -> td [] [ text value ])
-                                                )
+                                            let
+                                                id =
+                                                    (Dict.get "id" item) |> Maybe.withDefault ""
+
+                                                item' =
+                                                    (Dict.remove "id" item)
+                                            in
+                                                tr []
+                                                    ((td []
+                                                        [ a [ href ("#" ++ name ++ "/" ++ id ++ "/change") ]
+                                                            [ text id ]
+                                                        ]
+                                                     )
+                                                        :: (item'
+                                                                |> Dict.values
+                                                                |> List.map (\value -> td [] [ text value ])
+                                                           )
+                                                    )
                                         )
                                 )
                             ]
