@@ -1,4 +1,4 @@
-module ItemList exposing (Msg, Model, update, view, init)
+module ItemList exposing (Msg, Model, DataList, update, view, init)
 
 import Dict
 import Debug

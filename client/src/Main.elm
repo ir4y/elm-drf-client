@@ -52,7 +52,7 @@ initPageModel url =
             Form.init url
     in
         ( { url = url
-          , dataList = Types.Loading
+          , dataList = Types.NotAsked
           , form = form
           }
         , cmd
@@ -119,7 +119,7 @@ type Msg
     | FetchFail (HttpBuilder.Error String)
     | FetchSucceed (HttpBuilder.Response (Dict.Dict String String))
     | FetchResourceFail (HttpBuilder.Error String)
-    | FetchResourceSucceed String (HttpBuilder.Response (List (Dict.Dict String String)))
+    | FetchResourceSucceed String (HttpBuilder.Response ItemList.DataList)
 
 
 getUrlByIndex : Schema -> Int -> String
@@ -177,9 +177,23 @@ update msg model =
                 schema =
                     Dict.map (\key value -> fst value) initSchema
 
+                dataLoadCmds =
+                    case model.route of
+                        Routing.List name ->
+                            case Dict.get name schema of
+                                Nothing ->
+                                    [ Cmd.none ]
+
+                                Just pageModel ->
+                                    [ getResource name pageModel.url ]
+
+                        _ ->
+                            [ Cmd.none ]
+
                 cmds =
                     Dict.map (\key value -> Cmd.map (FormMsg key) (snd value)) initSchema
                         |> Dict.values
+                        |> List.append dataLoadCmds
                         |> Cmd.batch
             in
                 ( { model | schema = Types.Success schema }, cmds )
