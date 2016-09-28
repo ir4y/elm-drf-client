@@ -10,6 +10,7 @@ import Material.Scheme
 import Material.Layout as Layout
 import Material.Button as Button
 import Material.Grid as Grid
+import Material.Spinner as Loading
 import Navigation
 import Routing
 import Navigation
@@ -20,6 +21,7 @@ import Maybe
 import Task
 import ItemList
 import Array
+import Types
 
 
 main =
@@ -38,7 +40,7 @@ main =
 
 type alias PageModel =
     { url : String
-    , dataList : List (Dict.Dict String String)
+    , dataList : ItemList.Model
     , form : Form.Model
     }
 
@@ -50,22 +52,26 @@ initPageModel url =
             Form.init url
     in
         ( { url = url
-          , dataList = []
+          , dataList = Types.Loading
           , form = form
           }
         , cmd
         )
 
 
+type alias Schema =
+    Dict.Dict String PageModel
+
+
 type alias Model =
-    { schema : Dict.Dict String PageModel
+    { schema : Types.RemoteData String Schema
     , route : Routing.Route
     , mdl : Material.Model
     }
 
 
 init routeResult =
-    ( { schema = Dict.empty
+    ( { schema = Types.Loading
       , route = Routing.routeFromResult routeResult
       , mdl = Material.model
       }
@@ -82,12 +88,17 @@ urlUpdate result model =
         cmd =
             case currentRoute of
                 Routing.List name ->
-                    case Dict.get name model.schema of
-                        Nothing ->
-                            Cmd.none
+                    case model.schema of
+                        Types.Success schema ->
+                            case Dict.get name schema of
+                                Nothing ->
+                                    Cmd.none
 
-                        Just pageModel ->
-                            getResource name pageModel.url
+                                Just pageModel ->
+                                    getResource name pageModel.url
+
+                        _ ->
+                            Cmd.none
 
                 _ ->
                     Cmd.none
@@ -111,11 +122,11 @@ type Msg
     | FetchResourceSucceed String (HttpBuilder.Response (List (Dict.Dict String String)))
 
 
-getUrlByIndex : Model -> Int -> String
-getUrlByIndex model index =
+getUrlByIndex : Schema -> Int -> String
+getUrlByIndex schema index =
     let
         keys =
-            Dict.keys model.schema |> Array.fromList
+            Dict.keys schema |> Array.fromList
 
         url =
             Array.get index keys |> Maybe.withDefault ""
@@ -130,7 +141,12 @@ update msg model =
             ( model, Navigation.newUrl <| "#" ++ name ++ "/add" )
 
         SelectTab tab ->
-            ( model, getUrlByIndex model tab |> Navigation.newUrl )
+            case model.schema of
+                Types.Success schema ->
+                    ( model, getUrlByIndex schema tab |> Navigation.newUrl )
+
+                _ ->
+                    ( model, Cmd.none )
 
         Mdl msg' ->
             Material.update msg' model
@@ -166,47 +182,67 @@ update msg model =
                         |> Dict.values
                         |> Cmd.batch
             in
-                ( { model | schema = schema }, cmds )
+                ( { model | schema = Types.Success schema }, cmds )
+
+        FetchFail error ->
+            ( { model
+                | schema =
+                    error
+                        |> toString
+                        |> Types.Failure
+              }
+            , Cmd.none
+            )
 
         FetchResourceSucceed name response ->
-            case (Dict.get name model.schema) of
-                Nothing ->
+            case model.schema of
+                Types.Success schema ->
+                    case (Dict.get name schema) of
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                        Just pageModel ->
+                            let
+                                pageModel' =
+                                    { pageModel | dataList = Types.Success response.data }
+
+                                schema' =
+                                    Dict.insert name pageModel' schema
+
+                                model' =
+                                    { model | schema = Types.Success schema' }
+                            in
+                                ( model', Cmd.none )
+
+                _ ->
                     ( model, Cmd.none )
-
-                Just pageModel ->
-                    let
-                        pageModel' =
-                            { pageModel | dataList = response.data }
-
-                        schema' =
-                            Dict.insert name pageModel' model.schema
-
-                        model' =
-                            { model | schema = schema' }
-                    in
-                        ( model', Cmd.none )
 
         _ ->
             ( model, Cmd.none )
 
 
 apply_update_or_noting model name msg' update getSubState setSubState msgWrap =
-    case (Dict.get name model.schema) of
-        Nothing ->
+    case model.schema of
+        Types.Success schema ->
+            case (Dict.get name schema) of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just pageModel ->
+                    let
+                        ( newSubState, cmd' ) =
+                            update msg' (getSubState pageModel)
+
+                        pageModel' =
+                            setSubState pageModel newSubState
+
+                        schema' =
+                            Dict.insert name pageModel' schema
+                    in
+                        ( { model | schema = Types.Success schema' }, cmd' |> Cmd.map msgWrap )
+
+        _ ->
             ( model, Cmd.none )
-
-        Just pageModel ->
-            let
-                ( newSubState, cmd' ) =
-                    update msg' (getSubState pageModel)
-
-                pageModel' =
-                    setSubState pageModel newSubState
-
-                schema =
-                    Dict.insert name pageModel' model.schema
-            in
-                ( { model | schema = schema }, cmd' |> Cmd.map msgWrap )
 
 
 
@@ -217,9 +253,9 @@ type alias Mdl =
     Material.Model
 
 
-getIndexByResourceName : Model -> String -> Int
-getIndexByResourceName model resourceName =
-    Dict.keys model.schema
+getIndexByResourceName : Schema -> String -> Int
+getIndexByResourceName schema resourceName =
+    Dict.keys schema
         |> Array.fromList
         |> Array.toIndexedList
         |> List.filter (\( index, name ) -> name == resourceName)
@@ -228,43 +264,57 @@ getIndexByResourceName model resourceName =
         |> fst
 
 
-getIndexByRoute : Model -> Int
-getIndexByRoute model =
-    case model.route of
+getIndexByRoute : Routing.Route -> Schema -> Int
+getIndexByRoute route schema =
+    case route of
         Routing.Index ->
             -1
 
         Routing.List name ->
-            getIndexByResourceName model name
+            getIndexByResourceName schema name
 
         Routing.Change name _ ->
-            getIndexByResourceName model name
+            getIndexByResourceName schema name
 
         Routing.Add name ->
-            getIndexByResourceName model name
+            getIndexByResourceName schema name
 
 
 view model =
-    let
-        tabTitles =
-            Dict.keys model.schema |> List.map text
-    in
-        Layout.render Mdl
-            model.mdl
-            [ Layout.fixedHeader
-            , Layout.selectedTab (getIndexByRoute model)
-            , Layout.onSelectTab SelectTab
-            ]
-            { header = []
-            , drawer = []
-            , tabs = ( tabTitles, [] )
-            , main = [ view' model ]
-            }
-            |> Material.Scheme.topWithScheme Color.Blue Color.LightBlue
+    Material.Scheme.topWithScheme
+        Color.Blue
+        Color.LightBlue
+        (case model.schema of
+            Types.Success schema ->
+                let
+                    tabTitles =
+                        Dict.keys schema |> List.map text
+                in
+                    Layout.render Mdl
+                        model.mdl
+                        [ Layout.fixedHeader
+                        , Layout.selectedTab (getIndexByRoute model.route schema)
+                        , Layout.onSelectTab SelectTab
+                        ]
+                        { header = []
+                        , drawer = []
+                        , tabs = ( tabTitles, [] )
+                        , main = [ view' schema model ]
+                        }
+
+            Types.Failure error ->
+                div [] [ text error ]
+
+            Types.Loading ->
+                div [] [ Loading.spinner [ Loading.active True ] ]
+
+            Types.NotAsked ->
+                div [] [ text "not asked yet" ]
+        )
 
 
-view' : Model -> Html Msg
-view' model =
+view' : Schema -> Model -> Html Msg
+view' schema model =
     let
         getHeader name =
             Button.render Mdl
@@ -280,7 +330,7 @@ view' model =
                 Routing.Add name ->
                     ( getHeader name
                     , get_view_or_empy_div name
-                        (Dict.get name model.schema)
+                        (Dict.get name schema)
                         (FormMsg name)
                         (\page -> Form.view page.form)
                     )
@@ -288,7 +338,7 @@ view' model =
                 Routing.List name ->
                     ( getHeader name
                     , get_view_or_empy_div name
-                        (Dict.get name model.schema)
+                        (Dict.get name schema)
                         (ListMsg name)
                         (\page -> ItemList.view page.dataList)
                     )

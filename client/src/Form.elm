@@ -18,19 +18,26 @@ import Material
 import Material.Button as Button
 import Material.Spinner as Loading
 import Task
+import Types
 
 
 -- MODEL
 
 
+type alias FormState =
+    Types.RemoteData String
+        { formInfo : FormTypes.FormInfo
+        , validate : FormTypes.FormData -> FormTypes.FormErrors
+        }
+
+
 type alias Model =
     { mdl : Material.Model
     , form : Form.Model
-    , formInfo : FormTypes.FormInfo
-    , preloader : Bool
-    , validate : FormTypes.FormData -> FormTypes.FormErrors
+    , formState : FormState
     , formErrors : FormTypes.FormErrors
     , url : String
+    , preloader : Bool
     }
 
 
@@ -38,11 +45,10 @@ init : String -> ( Model, Cmd Msg )
 init url =
     ( { mdl = Material.model
       , form = Form.init
-      , formInfo = []
-      , preloader = True
-      , validate = (\_ -> FormTypes.emptyFormErrors)
+      , formState = Types.Loading
       , formErrors = FormTypes.emptyFormErrors
       , url = url
+      , preloader = False
       }
     , getQustionInfo url
     )
@@ -69,7 +75,12 @@ update msg model =
             Material.update action' model
 
         FormMsg msg' ->
-            ( { model | form = Form.update model.validate msg' model.form }, Cmd.none )
+            case model.formState of
+                Types.Success formState ->
+                    ( { model | form = Form.update formState.validate msg' model.form }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
 
         FetchSucceed response ->
             let
@@ -77,15 +88,24 @@ update msg model =
                     Validate.getValidator response.data
             in
                 ( { model
-                    | formInfo = response.data
-                    , validate = validate
-                    , preloader = False
+                    | formState =
+                        Types.Success
+                            { formInfo = response.data
+                            , validate = validate
+                            }
                   }
                 , Cmd.none
                 )
 
         FetchFail error ->
-            ( { model | preloader = False }, Cmd.none )
+            ( { model
+                | formState =
+                    error
+                        |> toString
+                        |> Types.Failure
+              }
+            , Cmd.none
+            )
 
         UploadSucceed response ->
             ( { model
@@ -125,17 +145,30 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ App.map FormMsg (Form.view model.formInfo model.formErrors model.form)
-        , if model.preloader then
-            Loading.spinner [ Loading.active model.preloader ]
-          else
-            Button.render MDL
-                [ 0 ]
-                model.mdl
-                [ Button.raised
-                , Button.onClick SubmitForm
-                ]
-                [ text "Submit" ]
+        [ case model.formState of
+            Types.NotAsked ->
+                div [] []
+
+            Types.Loading ->
+                Loading.spinner [ Loading.active model.preloader ]
+
+            Types.Failure message ->
+                div [] [ text message ]
+
+            Types.Success formState ->
+                if model.preloader then
+                    Loading.spinner [ Loading.active model.preloader ]
+                else
+                    div []
+                        [ App.map FormMsg (Form.view formState.formInfo model.formErrors model.form)
+                        , Button.render MDL
+                            [ 0 ]
+                            model.mdl
+                            [ Button.raised
+                            , Button.onClick SubmitForm
+                            ]
+                            [ text "Submit" ]
+                        ]
         ]
 
 
