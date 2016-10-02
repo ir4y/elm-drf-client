@@ -17,11 +17,11 @@ import Navigation
 import Dict
 import Services exposing (getResourcesInfoTask, getResourceTask)
 import HttpBuilder
-import Maybe
+import Maybe exposing (..)
 import Task
 import ItemList
 import Array
-import Types
+import Types exposing (asMaybe)
 
 
 main =
@@ -88,17 +88,11 @@ urlUpdate result model =
             Routing.routeFromResult result
 
         handleUrlWithParam name =
-            case model.schema of
-                Types.Success schema ->
-                    case Dict.get name schema of
-                        Nothing ->
-                            gotoRoot
-
-                        Just pageModel ->
-                            getResource name pageModel.url
-
-                _ ->
-                    Cmd.none
+            (asMaybe model.schema)
+                `andThen` (Dict.get name)
+                |> map .url
+                |> map (getResource name)
+                |> withDefault gotoRoot
 
         cmd =
             case currentRoute of
@@ -114,15 +108,13 @@ urlUpdate result model =
         model' =
             case currentRoute of
                 Routing.Change name id ->
-                    case model.schema of
-                        Types.Success schema ->
-                            case Dict.get name schema of
-                                Nothing ->
-                                    model
-
-                                Just pageModel ->
-                                    case pageModel.dataList of
-                                        Types.Success dataList ->
+                    (asMaybe model.schema)
+                        `andThen` (Dict.get name)
+                        `andThen`
+                            (\pageModel ->
+                                (asMaybe pageModel.dataList)
+                                    |> map
+                                        (\dataList ->
                                             { model
                                                 | editForm =
                                                     Form.initEditForm
@@ -137,12 +129,9 @@ urlUpdate result model =
                                                             |> Maybe.withDefault (Dict.insert "id" "none" Dict.empty)
                                                         )
                                             }
-
-                                        _ ->
-                                            model
-
-                        _ ->
-                            model
+                                        )
+                            )
+                        |> withDefault model
 
                 _ ->
                     model
@@ -163,7 +152,7 @@ type Msg
     | ListMsg String ItemList.Msg
     | FetchFail (HttpBuilder.Error String)
     | FetchSucceed (HttpBuilder.Response (Dict.Dict String String))
-    | FetchResourceFail (HttpBuilder.Error String)
+    | FetchResourceFail String (HttpBuilder.Error String)
     | FetchResourceSucceed String (HttpBuilder.Response ItemList.DataList)
 
 
@@ -179,6 +168,16 @@ getUrlByIndex schema index =
         "#" ++ url
 
 
+pageMap model name fn =
+    (asMaybe model.schema)
+        `andThen`
+            (\schema ->
+                (Dict.get name schema)
+                    |> map
+                        (\pageModel -> fn schema pageModel)
+            )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -186,12 +185,11 @@ update msg model =
             ( model, Navigation.newUrl <| "#" ++ name ++ "/add" )
 
         SelectTab tab ->
-            case model.schema of
-                Types.Success schema ->
-                    ( model, getUrlByIndex schema tab |> Navigation.newUrl )
-
-                _ ->
-                    ( model, Cmd.none )
+            ( model
+            , (asMaybe model.schema)
+                |> map (\schema -> (getUrlByIndex schema tab) |> Navigation.newUrl)
+                |> withDefault Cmd.none
+            )
 
         Mdl msg' ->
             Material.update msg' model
@@ -229,31 +227,25 @@ update msg model =
                 schema =
                     Dict.map (\key value -> fst value) initSchema
 
-                dataLoadCmds =
-                    case model.route of
+                dataLoadCmd =
+                    (case model.route of
                         Routing.Add name ->
-                            case Dict.get name schema of
-                                Nothing ->
-                                    [ gotoRoot ]
-
-                                _ ->
-                                    []
+                            (Dict.get name schema) `andThen` (\_ -> Just Cmd.none)
 
                         Routing.List name ->
-                            case Dict.get name schema of
-                                Nothing ->
-                                    [ gotoRoot ]
-
-                                Just pageModel ->
-                                    [ getResource name pageModel.url ]
+                            (Dict.get name schema)
+                                |> map .url
+                                |> map (getResource name)
 
                         _ ->
-                            [ Cmd.none ]
+                            Just Cmd.none
+                    )
+                        |> withDefault gotoRoot
 
                 cmds =
                     Dict.map (\key value -> Cmd.map (FormMsg key) (snd value)) initSchema
                         |> Dict.values
-                        |> List.append dataLoadCmds
+                        |> List.append [ dataLoadCmd ]
                         |> Cmd.batch
             in
                 ( { model | schema = Types.Success schema }, cmds )
@@ -269,54 +261,63 @@ update msg model =
             )
 
         FetchResourceSucceed name response ->
-            case model.schema of
-                Types.Success schema ->
-                    case (Dict.get name schema) of
-                        Nothing ->
-                            ( model, Cmd.none )
-
-                        Just pageModel ->
-                            let
-                                pageModel' =
-                                    { pageModel | dataList = Types.Success response.data }
-
-                                schema' =
-                                    Dict.insert name pageModel' schema
-
-                                model' =
-                                    { model | schema = Types.Success schema' }
-                            in
-                                ( model', Cmd.none )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        _ ->
-            ( model, Cmd.none )
-
-
-apply_update_or_noting model name msg' update getSubState setSubState msgWrap =
-    case model.schema of
-        Types.Success schema ->
-            case (Dict.get name schema) of
-                Nothing ->
-                    ( model, Cmd.none )
-
-                Just pageModel ->
+            ( pageMap model
+                name
+                (\schema pageModel ->
                     let
-                        ( newSubState, cmd' ) =
-                            update msg' (getSubState pageModel)
-
                         pageModel' =
-                            setSubState pageModel newSubState
+                            { pageModel | dataList = Types.Success response.data }
 
                         schema' =
                             Dict.insert name pageModel' schema
-                    in
-                        ( { model | schema = Types.Success schema' }, cmd' |> Cmd.map msgWrap )
 
-        _ ->
-            ( model, Cmd.none )
+                        model' =
+                            { model | schema = Types.Success schema' }
+                    in
+                        model'
+                )
+                |> withDefault model
+            , Cmd.none
+            )
+
+        FetchResourceFail name error ->
+            ( pageMap model
+                name
+                (\schema pageModel ->
+                    let
+                        pageModel' =
+                            { pageModel | dataList = Types.Failure (toString error) }
+
+                        schema' =
+                            Dict.insert name pageModel' schema
+
+                        model' =
+                            { model | schema = Types.Success schema' }
+                    in
+                        model'
+                )
+                |> withDefault model
+            , Cmd.none
+            )
+
+
+apply_update_or_noting model name msg' update getSubState setSubState msgWrap =
+    pageMap model
+        name
+        (\schema pageModel ->
+            let
+                ( newSubState, cmd' ) =
+                    update msg' (getSubState pageModel)
+
+                pageModel' =
+                    setSubState pageModel newSubState
+
+                schema' =
+                    Dict.insert name pageModel' schema
+            in
+                ( { model | schema = Types.Success schema' }, cmd' |> Cmd.map msgWrap )
+        )
+        |> withDefault ( model, Cmd.none )
 
 
 
@@ -473,4 +474,4 @@ getQustionInfo =
 getResource : String -> String -> Cmd Msg
 getResource name url =
     getResourceTask url
-        |> Task.perform FetchResourceFail (FetchResourceSucceed name)
+        |> Task.perform (FetchResourceFail name) (FetchResourceSucceed name)
