@@ -10,7 +10,9 @@ module Form.Form
         , view
         )
 
-import Html exposing (Html, text)
+import Html exposing (Html, text, select, option)
+import Html.Attributes exposing (value, selected)
+import Html.Events exposing (onInput)
 import Form.Types as FormTypes
 import Form.Validate as Validate
 import Material
@@ -18,6 +20,7 @@ import Material.Table as Table
 import Material.Textfield as Textfield
 import Material.Button as Button exposing (..)
 import Dict
+import Maybe
 
 
 type alias Model =
@@ -89,6 +92,23 @@ update validate msg model =
                 }
 
 
+buildOptionParam : FormTypes.Choice -> String -> List (Html.Attribute b)
+buildOptionParam o selectedOptionId =
+    if o.value == selectedOptionId then
+        [ value o.value
+        , selected True
+        ]
+    else
+        [ value o.value ]
+
+
+buildOptions : FormTypes.FieldInfo -> String -> List (Html Msg)
+buildOptions fieldInfo selected =
+    fieldInfo.choices
+        |> Maybe.withDefault []
+        |> List.map (\o -> option (buildOptionParam o selected) [ text o.displayName ])
+
+
 tableItemView : FormTypes.FormErrors -> Model -> ( String, FormTypes.FieldInfo ) -> Int -> Html Msg
 tableItemView formErrors model ( name, fieldInfo ) index =
     Table.tr []
@@ -102,20 +122,26 @@ tableItemView formErrors model ( name, fieldInfo ) index =
                 )
             ]
         , Table.td []
-            [ Textfield.render MDL
-                [ index ]
-                model.mdl
-                (List.concat
-                    [ [ Textfield.label fieldInfo.label
-                      , Textfield.value (FormTypes.getFormValue name model.formData)
-                      , Textfield.onInput (UserInput name)
-                      ]
-                    , if fieldInfo.readOnly then
-                        [ Textfield.disabled ]
-                      else
-                        []
-                    ]
-                )
+            [ case fieldInfo.fieldType of
+                FormTypes.Field ->
+                    select [ onInput (UserInput name) ]
+                        (buildOptions fieldInfo (FormTypes.getFormValue name model.formData))
+
+                _ ->
+                    Textfield.render MDL
+                        [ index ]
+                        model.mdl
+                        (List.concat
+                            [ [ Textfield.label fieldInfo.label
+                              , Textfield.value (FormTypes.getFormValue name model.formData)
+                              , Textfield.onInput (UserInput name)
+                              ]
+                            , if fieldInfo.readOnly then
+                                [ Textfield.disabled ]
+                              else
+                                []
+                            ]
+                        )
             ]
         , Table.td []
             (List.map text

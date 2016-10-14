@@ -12,6 +12,8 @@ import Json.Encode as Encode
 import Task
 import Form.Types as FormTypes
 import Dict
+import Result
+import Debug
 
 
 questionOptionDecoder : Decode.Decoder FormTypes.FormInfo
@@ -43,11 +45,42 @@ updateFormAtServerTask url data =
 
 fieldInfoDecoder : Decode.Decoder FormTypes.FieldInfo
 fieldInfoDecoder =
-    Decode.object4 FormTypes.FieldInfo
-        ("type" := Decode.string)
+    Decode.object5 FormTypes.FieldInfo
+        ("type" := typeDecoder)
         ("required" := Decode.bool)
         ("read_only" := Decode.bool)
         ("label" := Decode.string)
+        (Decode.maybe ("choices" := (Decode.list choiceDecoder)))
+
+
+typeDecoder : Decode.Decoder FormTypes.FieldType
+typeDecoder =
+    let
+        decodeType string =
+            case string of
+                "integer" ->
+                    Result.Ok FormTypes.Integer
+
+                "datetime" ->
+                    Result.Ok FormTypes.Datetime
+
+                "string" ->
+                    Result.Ok FormTypes.String
+
+                "field" ->
+                    Result.Ok FormTypes.Field
+
+                _ ->
+                    Result.Err ("Not valid field type: " ++ string)
+    in
+        Decode.customDecoder Decode.string decodeType
+
+
+choiceDecoder : Decode.Decoder FormTypes.Choice
+choiceDecoder =
+    Decode.object2 FormTypes.Choice
+        ("value" := Decode.string)
+        ("display_name" := Decode.string)
 
 
 wrapValues : ( String, String ) -> ( String, Encode.Value )

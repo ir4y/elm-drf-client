@@ -1,10 +1,12 @@
 module Form.Types
     exposing
         ( FieldInfo
+        , FieldType(..)
         , FormInfo
         , FormData
         , FormErrors
         , FormDirtyState
+        , Choice
         , emptyFormData
         , getFormValue
         , emptyFormErrors
@@ -65,8 +67,22 @@ isFieldDirty name dirtyState =
 
 
 type alias FieldInfo =
-    { fieldType : String
+    { fieldType : FieldType
     , required : Bool
     , readOnly : Bool
     , label : String
+    , choices : Maybe (List Choice)
+    }
+
+
+type FieldType
+    = Integer
+    | Datetime
+    | String
+    | Field
+
+
+type alias Choice =
+    { value : String
+    , displayName : String
     }
