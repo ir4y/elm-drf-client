@@ -5,15 +5,15 @@ module Form.Services
         , updateFormAtServerTask
         )
 
+import Form.Types as FormTypes
+import Debug
+import Dict
 import HttpBuilder
 import Json.Decode as Decode
 import Json.Decode exposing ((:=))
 import Json.Encode as Encode
-import Task
-import Form.Types as FormTypes
-import Dict
 import Result
-import Debug
+import Task
 
 
 questionOptionDecoder : Decode.Decoder FormTypes.FormInfo

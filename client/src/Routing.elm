@@ -1,7 +1,7 @@
 module Routing exposing (..)
 
-import String
 import Navigation
+import String
 import UrlParser exposing (..)
 
 type Route

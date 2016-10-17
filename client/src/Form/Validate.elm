@@ -1,9 +1,9 @@
 module Form.Validate exposing (..)
 
 import Form.Types as FormTypes
-import Validate
-import List
 import Dict
+import List
+import Validate
 
 
 buildValidator : ( String, FormTypes.FieldInfo ) -> Validate.Validator ( String, String ) FormTypes.FormData

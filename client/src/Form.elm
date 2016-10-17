@@ -9,19 +9,19 @@ module Form
         , view
         )
 
+import Form.Form as Form
+import Form.Services exposing (..)
+import Form.Types as FormTypes
+import Form.Validate as Validate
+import Types
+import Dict
 import Html exposing (Html, div, text)
 import Html.App as App
 import HttpBuilder
-import Form.Types as FormTypes
-import Form.Form as Form
-import Form.Services exposing (..)
-import Form.Validate as Validate
 import Material
 import Material.Button as Button
 import Material.Spinner as Loading
 import Task
-import Types
-import Dict
 
 
 -- MODEL

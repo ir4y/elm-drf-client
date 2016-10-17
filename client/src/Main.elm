@@ -1,29 +1,29 @@
 module Main exposing (..)
 
-import Html exposing (..)
-import Html.Attributes exposing (href)
-import Html.App as App
 import Form
-import Material
-import Material.Color as Color
-import Material.Scheme
-import Material.Layout as Layout
-import Material.Button as Button
-import Material.Grid as Grid
-import Material.Spinner as Loading
-import Navigation
-import Routing
-import Navigation
-import Dict
-import Services exposing (getResourcesInfoTask, getResourceTask)
-import HttpBuilder
-import Maybe exposing (..)
-import Task
 import ItemList
-import Array
+import Routing
+import Services exposing (getResourcesInfoTask, getResourceTask)
 import Types exposing (asMaybe)
+import Array
+import Dict
+import Html exposing (..)
+import Html.App as App
+import HttpBuilder
+import Material
+import Material.Button as Button
+import Material.Color as Color
+import Material.Grid as Grid
+import Material.Layout as Layout
+import Material.Scheme
+import Material.Spinner as Loading
+import Maybe exposing (..)
+import Navigation
+import Navigation
+import Task
 
 
+main : Program Never
 main =
     Navigation.program Routing.parser
         { init = init
@@ -71,6 +71,7 @@ type alias Model =
     }
 
 
+init : Result String Routing.Route -> ( Model, Cmd Msg )
 init routeResult =
     ( { schema = Types.Loading
       , route = Routing.routeFromResult routeResult
@@ -168,6 +169,7 @@ getUrlByIndex schema index =
         "#" ++ url
 
 
+pageMap : Model -> String -> (Schema -> PageModel -> a) -> Maybe a
 pageMap model name fn =
     (asMaybe model.schema)
         `andThen`
@@ -195,7 +197,7 @@ update msg model =
             Material.update msg' model
 
         FormMsg name msg' ->
-            apply_update_or_noting model
+            apply_update_or_nothing model
                 name
                 msg'
                 Form.update
@@ -211,7 +213,7 @@ update msg model =
                 ( { model | editForm = editForm }, Cmd.map EditFormMsg cmd )
 
         ListMsg name msg' ->
-            apply_update_or_noting model
+            apply_update_or_nothing model
                 name
                 msg'
                 ItemList.update
@@ -301,7 +303,16 @@ update msg model =
             )
 
 
-apply_update_or_noting model name msg' update getSubState setSubState msgWrap =
+apply_update_or_nothing :
+    Model
+    -> String
+    -> msg
+    -> (msg -> m -> ( m, Cmd cmd ))
+    -> (PageModel -> m)
+    -> (PageModel -> m -> PageModel)
+    -> (cmd -> Msg)
+    -> ( Model, Cmd Msg )
+apply_update_or_nothing model name msg' update getSubState setSubState msgWrap =
     pageMap model
         name
         (\schema pageModel ->
@@ -355,6 +366,7 @@ getIndexByRoute route schema =
             getIndexByResourceName schema name
 
 
+view : Model -> Html Msg
 view model =
     Material.Scheme.topWithScheme
         Color.Blue

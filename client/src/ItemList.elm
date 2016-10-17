@@ -1,12 +1,12 @@
 module ItemList exposing (Msg, Model, DataList, update, view, init)
 
-import Dict
+import Types
 import Debug
-import Material.Table exposing (..)
-import Material.Spinner as Loading
+import Dict
 import Html exposing (text, div, a)
 import Html.Attributes exposing (href)
-import Types
+import Material.Spinner as Loading
+import Material.Table exposing (..)
 import Maybe
 
 

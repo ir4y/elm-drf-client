@@ -10,16 +10,16 @@ module Form.Form
         , view
         )
 
+import Form.Types as FormTypes
+import Form.Validate as Validate
+import Dict
 import Html exposing (Html, text, select, option)
 import Html.Attributes exposing (value, selected)
 import Html.Events exposing (onInput)
-import Form.Types as FormTypes
-import Form.Validate as Validate
 import Material
+import Material.Button as Button exposing (..)
 import Material.Table as Table
 import Material.Textfield as Textfield
-import Material.Button as Button exposing (..)
-import Dict
 import Maybe
 
 
