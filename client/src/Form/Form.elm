@@ -20,6 +20,7 @@ import Material
 import Material.Button as Button exposing (..)
 import Material.Table as Table
 import Material.Textfield as Textfield
+import Material.Options as TextfieldOptions
 import Maybe
 
 
@@ -30,13 +31,13 @@ type alias Model =
     , formDirtyState : FormTypes.FormDirtyState
     }
 
-
+cleanDirtyState : Model -> Model
 cleanDirtyState model =
     { model
         | formDirtyState = FormTypes.emptyFormDirtyState
     }
 
-
+cleanup : Model -> Model
 cleanup model =
     { model
         | formData = FormTypes.emptyFormData
@@ -66,13 +67,16 @@ initWithData formData =
 type Msg
     = MDL (Material.Msg Msg)
     | UserInput String String
+    | NoOp
 
 
 update : (FormTypes.FormData -> FormTypes.FormErrors) -> Msg -> Model -> Model
 update validate msg model =
     case msg of
-        MDL action' ->
-            Material.update action' model |> fst
+        NoOp -> model
+        MDL action_ ->
+            Material.update (\_ -> NoOp) action_ model
+                |> Tuple.first
 
         UserInput key data ->
             let
@@ -134,7 +138,7 @@ tableItemView formErrors model ( name, fieldInfo ) index =
                         (List.concat
                             [ [ Textfield.label fieldInfo.label
                               , Textfield.value (FormTypes.getFormValue name model.formData)
-                              , Textfield.onInput (UserInput name)
+                              , TextfieldOptions.onInput (UserInput name)
                               ]
                             , if fieldInfo.readOnly then
                                 [ Textfield.disabled ]
@@ -142,6 +146,7 @@ tableItemView formErrors model ( name, fieldInfo ) index =
                                 []
                             ]
                         )
+                        []
             ]
         , Table.td []
             (List.map text
@@ -156,4 +161,4 @@ tableItemView formErrors model ( name, fieldInfo ) index =
 
 view : FormTypes.FormInfo -> FormTypes.FormErrors -> Model -> Html Msg
 view formInfo formErrors model =
-    Table.table [] (List.map2 (tableItemView formErrors model) formInfo [1..List.length formInfo])
+    Table.table [] (List.map2 (tableItemView formErrors model) formInfo (List.range 1 (List.length formInfo)))

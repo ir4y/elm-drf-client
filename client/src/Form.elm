@@ -14,13 +14,14 @@ import Form.Services exposing (..)
 import Form.Types as FormTypes
 import Form.Validate as Validate
 import Types
+import Http
 import Dict
 import Html exposing (Html, div, text)
-import Html.App as App
 import HttpBuilder
 import Material
 import Material.Button as Button
 import Material.Spinner as Loading
+import Material.Options as Options
 import Task
 
 
@@ -86,36 +87,39 @@ initEditForm url formState formData =
 type Msg
     = MDL (Material.Msg Msg)
     | FormMsg Form.Msg
-    | FetchFail (HttpBuilder.Error String)
-    | FetchSucceed (HttpBuilder.Response FormTypes.FormInfo)
-    | UploadFail (HttpBuilder.Error FormTypes.FormErrors)
-    | UploadSucceed (HttpBuilder.Response String)
+    | FetchFail Http.Error
+    | FetchSucceed FormTypes.FormInfo
+    | UploadFail Http.Error
+    | UploadSucceed
     | SubmitForm
+    | NoOp
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        MDL action' ->
-            Material.update action' model
+        NoOp ->
+            (model, Cmd.none)
+        MDL action_ ->
+            Material.update (\_ -> NoOp) action_ model
 
-        FormMsg msg' ->
+        FormMsg msg_ ->
             case model.formState of
                 Types.Success formState ->
-                    ( { model | form = Form.update formState.validate msg' model.form }, Cmd.none )
+                    ( { model | form = Form.update formState.validate msg_ model.form }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
-        FetchSucceed response ->
+        FetchSucceed formInfo ->
             let
                 validate =
-                    Validate.getValidator response.data
+                    Validate.getValidator formInfo
             in
                 ( { model
                     | formState =
                         Types.Success
-                            { formInfo = response.data
+                            { formInfo = formInfo
                             , validate = validate
                             }
                   }
@@ -132,7 +136,7 @@ update msg model =
             , Cmd.none
             )
 
-        UploadSucceed response ->
+        UploadSucceed ->
             ( { model
                 | form = Form.cleanup model.form
                 , formErrors = FormTypes.emptyFormErrors
@@ -143,21 +147,22 @@ update msg model =
 
         UploadFail error ->
             let
-                model' =
+                model_ =
                     { model | preloader = False, form = Form.cleanDirtyState model.form }
             in
-                case error of
-                    HttpBuilder.UnexpectedPayload _ ->
-                        ( model', Cmd.none )
+                ( model_, Cmd.none )
+                -- case error of
+                --     HttpBuilder.UnexpectedPayload _ ->
+                --         ( model_, Cmd.none )
 
-                    HttpBuilder.NetworkError ->
-                        ( model', Cmd.none )
+                --     HttpBuilder.NetworkError ->
+                --         ( model_, Cmd.none )
 
-                    HttpBuilder.Timeout ->
-                        ( model', Cmd.none )
+                --     HttpBuilder.Timeout ->
+                --         ( model_, Cmd.none )
 
-                    HttpBuilder.BadResponse response ->
-                        ( { model' | formErrors = response.data }, Cmd.none )
+                --     HttpBuilder.BadResponse response ->
+                --         ( { model_ | formErrors = response.data }, Cmd.none )
 
         SubmitForm ->
             ( { model | preloader = True }
@@ -192,12 +197,12 @@ view model =
                     Loading.spinner [ Loading.active model.preloader ]
                 else
                     div []
-                        [ App.map FormMsg (Form.view formState.formInfo model.formErrors model.form)
+                        [ Html.map FormMsg (Form.view formState.formInfo model.formErrors model.form)
                         , Button.render MDL
                             [ 0 ]
                             model.mdl
                             [ Button.raised
-                            , Button.onClick SubmitForm
+                            , Options.onClick SubmitForm
                             ]
                             [ text "Submit" ]
                         ]
@@ -220,16 +225,37 @@ subscriptions model =
 getFormInfo : String -> Cmd Msg
 getFormInfo url =
     getFormInfoTask url
-        |> Task.perform FetchFail FetchSucceed
+        (\result ->
+            case result of
+                Result.Ok formInfo ->
+                    FetchSucceed formInfo
+
+                Result.Err error ->
+                    FetchFail error
+        )
 
 
 sendFormToServer : String -> FormTypes.FormData -> Cmd Msg
 sendFormToServer url data =
     sendFormToServerTask url data
-        |> Task.perform UploadFail UploadSucceed
+        (\result ->
+            case result of
+                Result.Ok _ ->
+                    UploadSucceed
+
+                Result.Err error ->
+                    UploadFail error
+        )
 
 
 updateFormAtServer : String -> FormTypes.FormData -> Cmd Msg
 updateFormAtServer url data =
     updateFormAtServerTask url data
-        |> Task.perform UploadFail UploadSucceed
+        (\result ->
+            case result of
+                Result.Ok _ ->
+                    UploadSucceed
+
+                Result.Err error ->
+                    UploadFail error
+        )

@@ -1,4 +1,4 @@
-FROM node:5.8
+FROM node:7-alpine
 RUN npm install -g elm
 WORKDIR /app
 ADD . /app/user/

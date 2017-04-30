@@ -74,7 +74,7 @@ view name model =
                                                 id =
                                                     (Dict.get "id" item) |> Maybe.withDefault ""
 
-                                                item' =
+                                                item_ =
                                                     (Dict.remove "id" item)
                                             in
                                                 tr []
@@ -83,7 +83,7 @@ view name model =
                                                             [ text id ]
                                                         ]
                                                      )
-                                                        :: (item'
+                                                        :: (item_
                                                                 |> Dict.values
                                                                 |> List.map (\value -> td [] [ text value ])
                                                            )

@@ -1,4 +1,6 @@
-FROM python:3.5
+FROM python:3-alpine
+ENV LIBRARY_PATH=/lib:/usr/lib
+RUN apk update && apk add gcc postgresql-dev musl-dev 
 RUN mkdir -p /app/user
 RUN mkdir /src
 WORKDIR /app/user

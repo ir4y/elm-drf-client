@@ -7,10 +7,11 @@ module Form.Services
 
 import Form.Types as FormTypes
 import Debug
+import Http
 import Dict
 import HttpBuilder
 import Json.Decode as Decode
-import Json.Decode exposing ((:=))
+import Json.Decode.Pipeline exposing (decode, required, optional)
 import Json.Encode as Encode
 import Result
 import Task
@@ -21,36 +22,35 @@ questionOptionDecoder =
     Decode.at [ "actions", "POST" ] (Decode.keyValuePairs fieldInfoDecoder)
 
 
-getFormInfoTask : String -> Task.Task (HttpBuilder.Error String) (HttpBuilder.Response FormTypes.FormInfo)
-getFormInfoTask url =
+getFormInfoTask : String -> (Result Http.Error FormTypes.FormInfo -> msg) -> Cmd msg
+getFormInfoTask url handler =
     HttpBuilder.options url
-        |> HttpBuilder.send (HttpBuilder.jsonReader questionOptionDecoder) HttpBuilder.stringReader
+        |> HttpBuilder.withExpect (Http.expectJson questionOptionDecoder)
+        |> HttpBuilder.send handler
 
 
-sendFormToServerTask : String -> FormTypes.FormData -> Task.Task (HttpBuilder.Error FormTypes.FormErrors) (HttpBuilder.Response String)
-sendFormToServerTask url data =
+sendFormToServerTask : String -> FormTypes.FormData -> (Result Http.Error () -> msg) -> Cmd msg
+sendFormToServerTask url data handler =
     HttpBuilder.post url
         |> HttpBuilder.withJsonBody (formDataEncoder data)
-        |> HttpBuilder.withHeader "Content-Type" "application/json"
-        |> HttpBuilder.send HttpBuilder.stringReader (HttpBuilder.jsonReader (Decode.dict (Decode.list Decode.string)))
+        |> HttpBuilder.send handler
 
 
-updateFormAtServerTask : String -> FormTypes.FormData -> Task.Task (HttpBuilder.Error FormTypes.FormErrors) (HttpBuilder.Response String)
-updateFormAtServerTask url data =
+updateFormAtServerTask : String -> FormTypes.FormData -> (Result Http.Error () -> msg) -> Cmd msg
+updateFormAtServerTask url data handler =
     HttpBuilder.put url
         |> HttpBuilder.withJsonBody (formDataEncoder data)
-        |> HttpBuilder.withHeader "Content-Type" "application/json"
-        |> HttpBuilder.send HttpBuilder.stringReader (HttpBuilder.jsonReader (Decode.dict (Decode.list Decode.string)))
+        |> HttpBuilder.send handler
 
 
 fieldInfoDecoder : Decode.Decoder FormTypes.FieldInfo
 fieldInfoDecoder =
-    Decode.object5 FormTypes.FieldInfo
-        ("type" := typeDecoder)
-        ("required" := Decode.bool)
-        ("read_only" := Decode.bool)
-        ("label" := Decode.string)
-        (Decode.maybe ("choices" := (Decode.list choiceDecoder)))
+    decode FormTypes.FieldInfo
+        |> required "type" typeDecoder
+        |> required "required" Decode.bool
+        |> required "read_only" Decode.bool
+        |> required "label" Decode.string
+        |> optional "choices" ((Decode.list choiceDecoder) |> Decode.map Just) Nothing
 
 
 typeDecoder : Decode.Decoder FormTypes.FieldType
@@ -59,28 +59,28 @@ typeDecoder =
         decodeType string =
             case string of
                 "integer" ->
-                    Result.Ok FormTypes.Integer
+                    Decode.succeed FormTypes.Integer
 
                 "datetime" ->
-                    Result.Ok FormTypes.Datetime
+                    Decode.succeed FormTypes.Datetime
 
                 "string" ->
-                    Result.Ok FormTypes.String
+                    Decode.succeed FormTypes.String
 
                 "field" ->
-                    Result.Ok FormTypes.Field
+                    Decode.succeed FormTypes.Field
 
                 _ ->
-                    Result.Err ("Not valid field type: " ++ string)
+                    Decode.fail ("Not valid field type: " ++ string)
     in
-        Decode.customDecoder Decode.string decodeType
+        Decode.string |> Decode.andThen decodeType
 
 
 choiceDecoder : Decode.Decoder FormTypes.Choice
 choiceDecoder =
-    Decode.object2 FormTypes.Choice
-        ("value" := Decode.string)
-        ("display_name" := Decode.string)
+    decode FormTypes.Choice
+        |> required "value" Decode.string
+        |> required "display_name" Decode.string
 
 
 wrapValues : ( String, String ) -> ( String, Encode.Value )

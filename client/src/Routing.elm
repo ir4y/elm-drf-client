@@ -4,6 +4,7 @@ import Navigation
 import String
 import UrlParser exposing (..)
 
+
 type Route
     = Index
     | List String
@@ -14,23 +15,16 @@ type Route
 matchers : Parser (Route -> a) a
 matchers =
     oneOf
-        [ format Index (s "")
-        , format Change (string </> int </> (s "change"))
-        , format Add (string </> (s "add"))
-        , format List string
+        [ map Index (s "")
+        , map Change (string </> int </> (s "change"))
+        , map Add (string </> (s "add"))
+        , map List string
         ]
 
 
 hashParser : Navigation.Location -> Result String Route
 hashParser location =
-    location.hash
-        |> String.dropLeft 1
-        |> parse identity matchers
-
-
-parser : Navigation.Parser (Result String Route)
-parser =
-    Navigation.makeParser hashParser
+    parseHash matchers location |> Result.fromMaybe "parse error"
 
 
 routeFromResult : Result String Route -> Route

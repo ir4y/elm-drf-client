@@ -1,6 +1,6 @@
 {
-    "version": "1.0.0",
-    "summary": "some primitives to work with django rest framework",
+    "version": "2.0.0",
+    "summary": "Django rest framework api client",
     "repository": "https://github.com/ir4y/elm-drf-client.git",
     "license": "BSD3",
     "source-directories": [
@@ -8,13 +8,15 @@
     ],
     "exposed-modules": [],
     "dependencies": {
-        "debois/elm-mdl": "7.5.0 <= v < 8.0.0",
-        "elm-lang/core": "4.0.4 <= v < 5.0.0",
-        "elm-lang/html": "1.1.0 <= v < 2.0.0",
-        "elm-lang/navigation": "1.0.0 <= v < 2.0.0",
-        "evancz/url-parser": "1.0.0 <= v < 2.0.0",
-        "lukewestby/elm-http-builder": "2.1.0 <= v < 2.2.0",
-        "rtfeldman/elm-validate": "1.1.2 <= v < 1.2.0"
+        "NoRedInk/elm-decode-pipeline": "3.0.0 <= v < 4.0.0",
+        "debois/elm-mdl": "8.1.0 <= v < 9.0.0",
+        "elm-lang/core": "5.1.1 <= v < 6.0.0",
+        "elm-lang/html": "2.0.0 <= v < 3.0.0",
+        "elm-lang/http": "1.0.0 <= v < 2.0.0",
+        "elm-lang/navigation": "2.1.0 <= v < 3.0.0",
+        "evancz/url-parser": "2.0.1 <= v < 3.0.0",
+        "lukewestby/elm-http-builder": "5.1.0 <= v < 6.0.0",
+        "rtfeldman/elm-validate": "1.1.3 <= v < 2.0.0"
     },
-    "elm-version": "0.17.1 <= v < 0.18.0"
+    "elm-version": "0.18.0 <= v < 0.19.0"
 }
