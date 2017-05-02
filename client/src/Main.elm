@@ -127,6 +127,54 @@ pageMap model name fn =
                         (\pageModel -> fn schema pageModel)
             )
 
+updateFromRoute : Model -> Routing.Route -> (Model, Cmd Msg)
+updateFromRoute model route =
+    let
+        model_ = { model | route = route}
+    in
+        case route of
+            Routing.List name ->
+                let
+                    schema = Types.asMaybe model.schema
+                    cmd = schema
+                        |> Maybe.andThen (Dict.get name)
+                        |> Maybe.map .url
+                        |> Maybe.map (getResource name)
+                        |> Maybe.withDefault Cmd.none
+                in
+                  (model_, cmd)
+            Routing.Change name id ->
+                let
+                    schema = Types.asMaybe model.schema
+                    pageModel = schema
+                             |> Maybe.andThen (Dict.get name)
+                    dataList = Types.asMaybe (pageModel
+                             |> Maybe.map .dataList
+                             |> Maybe.withDefault Types.NotAsked)
+                             |> Maybe.withDefault []
+                    item = dataList
+                           |> List.filter
+                              (\item ->
+                                   (Dict.get "id" item) == (Maybe.Just <| toString id))
+                           |> List.head
+                           |> Maybe.withDefault (Dict.insert "id" "none" Dict.empty)
+                    model__ = case pageModel of
+                                  Just pageModel ->
+                                    { model_
+                                        | editForm =
+                                            Form.initEditForm
+                                            (pageModel.form.url ++ (toString id) ++ "/")
+                                            pageModel.form.formState
+                                            item
+                                            }
+
+                                  Nothing ->
+                                    model_
+                in
+                  (model__, Cmd.none)
+            _ ->
+                (model_, Cmd.none)
+
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -135,7 +183,7 @@ update msg model =
             ( model, Cmd.none )
 
         ChangeRoute route ->
-            ( { model | route = route }, Cmd.none )
+            updateFromRoute model route
 
         OpenAddPage name ->
             ( model, Navigation.newUrl <| "#" ++ name ++ "/add" )
