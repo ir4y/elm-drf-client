@@ -19,7 +19,6 @@ import Material.Spinner as Loading
 import Material.Options as Options
 import Maybe exposing (map, andThen, withDefault)
 import Navigation
-import Debug
 
 
 handleRoute : Navigation.Location -> Msg
