@@ -220,13 +220,27 @@ update msg model =
             Material.update (\_ -> NoOp) msg_ model
 
         FormMsg name msg_ ->
-            apply_update_or_nothing model
-                name
-                msg_
-                Form.update
-                .form
-                (\pageModel form -> { pageModel | form = form })
-                (FormMsg name)
+            let
+                ( model_, cmd ) =
+                    apply_update_or_nothing model
+                        name
+                        msg_
+                        Form.update
+                        .form
+                        (\pageModel form -> { pageModel | form = form })
+                        (FormMsg name)
+            in
+                ( model_
+                , Cmd.batch
+                    [ cmd
+                    , case msg_ of
+                        Form.UploadSucceed ->
+                            (changeRouteAfterFormSucceed model_.route)
+
+                        _ ->
+                            Cmd.none
+                    ]
+                )
 
         EditFormMsg msg_ ->
             let
@@ -498,6 +512,19 @@ subscriptions model =
 gotoRoot : Cmd Msg
 gotoRoot =
     Navigation.newUrl "#"
+
+
+changeRouteAfterFormSucceed : Routing.Route -> Cmd Msg
+changeRouteAfterFormSucceed route =
+    case route of
+        Routing.Add name ->
+            Navigation.newUrl ("#" ++ name)
+
+        Routing.Change name _ ->
+            Navigation.newUrl ("#" ++ name)
+
+        _ ->
+            Cmd.none
 
 
 getQustionInfo : Cmd Msg

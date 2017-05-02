@@ -1,7 +1,7 @@
 module Form
     exposing
         ( Model
-        , Msg
+        , Msg(UploadSucceed)
         , init
         , initEmpty
         , initEditForm
