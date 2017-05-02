@@ -1,5 +1,5 @@
-FROM node:7-alpine
-RUN npm install -g elm
+FROM node:7
+RUN yarn global add elm
 WORKDIR /app
 ADD . /app/user/
 WORKDIR /app/user/
