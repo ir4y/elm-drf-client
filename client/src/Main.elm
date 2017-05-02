@@ -247,7 +247,17 @@ update msg model =
                 ( editForm, cmd ) =
                     Form.update msg_ model.editForm
             in
-                ( { model | editForm = editForm }, Cmd.map EditFormMsg cmd )
+                ( { model | editForm = editForm }
+                , Cmd.batch
+                    [ Cmd.map EditFormMsg cmd
+                    , case msg_ of
+                        Form.UploadSucceed ->
+                            (changeRouteAfterFormSucceed model.route)
+
+                        _ ->
+                            Cmd.none
+                    ]
+                )
 
         ListMsg name msg_ ->
             apply_update_or_nothing model
