@@ -89,7 +89,7 @@ type Msg
     | FormMsg Form.Msg
     | FetchFail Http.Error
     | FetchSucceed FormTypes.FormInfo
-    | UploadFail Http.Error
+    | UploadFail Types.DrfError
     | UploadSucceed
     | SubmitForm
     | NoOp
@@ -150,19 +150,11 @@ update msg model =
                 model_ =
                     { model | preloader = False, form = Form.cleanDirtyState model.form }
             in
-                ( model_, Cmd.none )
-                -- case error of
-                --     HttpBuilder.UnexpectedPayload _ ->
-                --         ( model_, Cmd.none )
-
-                --     HttpBuilder.NetworkError ->
-                --         ( model_, Cmd.none )
-
-                --     HttpBuilder.Timeout ->
-                --         ( model_, Cmd.none )
-
-                --     HttpBuilder.BadResponse response ->
-                --         ( { model_ | formErrors = response.data }, Cmd.none )
+                case error of
+                    Types.DrfError data ->
+                        ( { model_ | formErrors = data }, Cmd.none )
+                    _ ->
+                        ( model_, Cmd.none )
 
         SubmitForm ->
             ( { model | preloader = True }
@@ -234,7 +226,6 @@ getFormInfo url =
                     FetchFail error
         )
 
-
 sendFormToServer : String -> FormTypes.FormData -> Cmd Msg
 sendFormToServer url data =
     sendFormToServerTask url data
@@ -244,7 +235,7 @@ sendFormToServer url data =
                     UploadSucceed
 
                 Result.Err error ->
-                    UploadFail error
+                    UploadFail (Types.fromHttpErrorToDrfError error)
         )
 
 
@@ -257,5 +248,5 @@ updateFormAtServer url data =
                     UploadSucceed
 
                 Result.Err error ->
-                    UploadFail error
+                    UploadFail (Types.fromHttpErrorToDrfError error)
         )

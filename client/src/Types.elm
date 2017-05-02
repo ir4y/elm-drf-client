@@ -1,6 +1,9 @@
 module Types exposing (..)
 
 import Maybe
+import Http
+import Dict exposing (Dict)
+import Json.Decode exposing (Decoder, dict, list, string, map, decodeString)
 
 
 type RemoteData e a
@@ -18,3 +21,23 @@ asMaybe remoteData =
 
         _ ->
             Nothing
+
+
+type DrfError
+    = DrfError (Dict String (List String))
+    | NonDrfError Http.Error
+
+
+drfErrorDecode : Decoder DrfError
+drfErrorDecode =
+    (dict (list string)) |> map DrfError
+
+
+fromHttpErrorToDrfError : Http.Error -> DrfError
+fromHttpErrorToDrfError error =
+    case error of
+        Http.BadStatus response ->
+            decodeString drfErrorDecode response.body
+                |> Result.withDefault (NonDrfError error)
+        _ ->
+            NonDrfError error
